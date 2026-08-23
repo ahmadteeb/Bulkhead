@@ -28,8 +28,22 @@ class ImageModel {
   }
 
   factory ImageModel.fromJson(Map<String, dynamic> json) {
-    final tags = (json['RepoTags'] as List<dynamic>?)?.cast<String>() ?? [];
-    
+    final tags = (json['RepoTags'] as List<dynamic>?)
+            ?.map((e) => e?.toString() ?? '')
+            .where((e) => e.isNotEmpty)
+            .toList() ??
+        [];
+
+    final digests = (json['RepoDigests'] as List<dynamic>?)
+            ?.map((e) => e?.toString() ?? '')
+            .where((e) => e.isNotEmpty)
+            .toList() ??
+        [];
+
+    if (tags.isEmpty && digests.isNotEmpty) {
+      tags.add(digests.first);
+    }
+
     final rawCreated = json['Created'];
     DateTime parsedCreated = DateTime.now();
     if (rawCreated is int) {

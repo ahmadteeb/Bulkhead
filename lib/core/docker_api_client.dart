@@ -150,8 +150,8 @@ class DockerApiClient {
   // --- IMAGES ---
 
   /// List Docker images
-  Future<List<ImageModel>> getImages() async {
-    final res = await _socket.request(method: 'GET', path: '/images/json');
+  Future<List<ImageModel>> getImages({bool showAll = true}) async {
+    final res = await _socket.request(method: 'GET', path: '/images/json?all=${showAll ? 1 : 0}');
     if (!res.isSuccess) {
       throw Exception('Failed to list images: ${res.body}');
     }

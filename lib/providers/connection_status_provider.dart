@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/docker_api_client.dart';
@@ -27,8 +26,7 @@ class ConnectionStatusState {
 
 final dockerApiClientProvider = Provider<DockerApiClient>((ref) {
   final socketPath = ref.watch(socketPathProvider);
-  final socket = DockerSocketConnection(socketPath: socketPath);
-  return DockerApiClient(socket: socket);
+  return DockerApiClient(socket: DockerSocketConnection(socketPath: socketPath));
 });
 
 final connectionStatusProvider =
@@ -39,19 +37,10 @@ final connectionStatusProvider =
 
 class ConnectionStatusNotifier extends StateNotifier<ConnectionStatusState> {
   final DockerApiClient _client;
-  Timer? _healthTimer;
 
   ConnectionStatusNotifier(this._client)
       : super(ConnectionStatusState(status: ConnectionStateEnum.connecting)) {
     checkConnection();
-    _startPeriodicHealthCheck();
-  }
-
-  void _startPeriodicHealthCheck() {
-    _healthTimer?.cancel();
-    _healthTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      checkConnection();
-    });
   }
 
   Future<void> checkConnection() async {
@@ -81,11 +70,5 @@ class ConnectionStatusNotifier extends StateNotifier<ConnectionStatusState> {
         errorMessage: e.toString(),
       );
     }
-  }
-
-  @override
-  void dispose() {
-    _healthTimer?.cancel();
-    super.dispose();
   }
 }

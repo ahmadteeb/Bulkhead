@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:path/path.dart' as p;
 
 import '../../models/compose_stack_model.dart';
 import '../../providers/compose_provider.dart';
@@ -177,6 +178,7 @@ services:
     final containerLowColor = AppColors.containerLow(context);
     final primaryContainerColor = Theme.of(context).colorScheme.primaryContainer;
     final onPrimaryContainerColor = Theme.of(context).colorScheme.onPrimaryContainer;
+    final mutedTextColor = Theme.of(context).textTheme.bodySmall?.color;
 
     final isAllSelected = composeState.stacks.isNotEmpty &&
         composeState.stacks.every((s) => _selectedPaths.contains(s.configFiles));
@@ -348,8 +350,8 @@ services:
                                 );
                                 if (confirm == true) {
                                   final paths = List<String>.from(_selectedPaths);
-                                  for (final p in paths) {
-                                    await ref.read(composeStacksNotifierProvider.notifier).removeStack(p, removeVolumes: true);
+                                  for (final path in paths) {
+                                    await ref.read(composeStacksNotifierProvider.notifier).removeStack(path, removeVolumes: true);
                                   }
                                   setState(() => _selectedPaths.clear());
                                 }
@@ -360,13 +362,17 @@ services:
                     columns: const [
                       DataTableColumnSpec(title: 'Stack Name', width: 180),
                       DataTableColumnSpec(title: 'Status', width: 140),
-                      DataTableColumnSpec(title: 'Config File Path', flex: true),
+                      DataTableColumnSpec(title: 'Compose File & Path', flex: true),
                       DataTableColumnSpec(title: 'Actions', width: 240),
                     ],
                     itemCount: composeState.stacks.length,
                     rowBuilder: (context, index) {
                       final stack = composeState.stacks[index];
                       final isSelected = _selectedPaths.contains(stack.configFiles);
+
+                      final filePath = stack.configFiles;
+                      final fileName = p.basename(filePath);
+                      final dirPath = p.dirname(filePath);
 
                       return InkWell(
                         onTap: () => setState(() => _selectedStack = stack),
@@ -404,15 +410,29 @@ services:
                                 child: StatusBadge.fromState(stack.status),
                               ),
 
-                              // Config Files Path
+                              // Config File Name & Path Subtitle
                               Expanded(
-                                child: Text(
-                                  stack.configFiles.isEmpty ? 'N/A' : stack.configFiles,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.jetBrainsMono(
-                                    fontSize: 11,
-                                    color: Theme.of(context).textTheme.bodySmall?.color,
-                                  ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      fileName.isEmpty ? 'docker-compose.yml' : fileName,
+                                      style: GoogleFonts.jetBrainsMono(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: onSurfaceColor,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      dirPath.isEmpty ? filePath : dirPath,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: GoogleFonts.jetBrainsMono(
+                                        fontSize: 11,
+                                        color: mutedTextColor,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
 
@@ -575,6 +595,8 @@ class __ComposeStackDetailViewState extends ConsumerState<_ComposeStackDetailVie
     final primaryContainerColor = Theme.of(context).colorScheme.primaryContainer;
     final onPrimaryContainerColor = Theme.of(context).colorScheme.onPrimaryContainer;
 
+    final fileName = p.basename(widget.stack.configFiles);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -610,7 +632,7 @@ class __ComposeStackDetailViewState extends ConsumerState<_ComposeStackDetailVie
                       }
                     },
               icon: const Icon(Icons.save, size: 18),
-              label: const Text('Save docker-compose.yml'),
+              label: Text('Save ${fileName.isEmpty ? "docker-compose.yml" : fileName}'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryContainerColor,
                 foregroundColor: onPrimaryContainerColor,
@@ -714,7 +736,7 @@ class __ComposeStackDetailViewState extends ConsumerState<_ComposeStackDetailVie
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'docker-compose.yml',
+                      fileName.isEmpty ? 'docker-compose.yml' : fileName,
                       style: GoogleFonts.jetBrainsMono(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,

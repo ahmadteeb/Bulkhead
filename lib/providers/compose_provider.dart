@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
 
 import '../core/compose_cli_client.dart';
 import '../models/compose_stack_model.dart';
@@ -39,6 +40,7 @@ final composeCliClientProvider = Provider<ComposeCliClient>((ref) {
 class ComposeStacksNotifier extends StateNotifier<ComposeState> {
   final ComposeCliClient _cli;
   final bool _isConnected;
+  final Set<String> _trackedFilePaths = {};
 
   ComposeStacksNotifier(this._cli, this._isConnected)
       : super(ComposeState(stacks: [], isLoading: true)) {
@@ -69,8 +71,33 @@ class ComposeStacksNotifier extends StateNotifier<ComposeState> {
       state = state.copyWith(isLoading: true, error: null);
     }
     try {
-      final list = await _cli.listStacks();
-      state = state.copyWith(stacks: list, isLoading: false, error: null);
+      final activeList = await _cli.listStacks();
+
+      // Track active stack paths
+      for (final s in activeList) {
+        if (s.configFiles.isNotEmpty) {
+          _trackedFilePaths.add(s.configFiles);
+        }
+      }
+
+      final combined = <ComposeStackModel>[...activeList];
+
+      // Re-add tracked stacks that are down/inactive so users can UP them again!
+      for (final filePath in _trackedFilePaths) {
+        final existsInActive = combined.any((s) => s.configFiles == filePath);
+        if (!existsInActive) {
+          final dirName = p.basename(p.dirname(filePath));
+          final stackName = dirName.isEmpty ? p.basenameWithoutExtension(filePath) : dirName;
+
+          combined.add(ComposeStackModel(
+            name: stackName,
+            status: 'stopped',
+            configFiles: filePath,
+          ));
+        }
+      }
+
+      state = state.copyWith(stacks: combined, isLoading: false, error: null);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }
@@ -78,6 +105,7 @@ class ComposeStacksNotifier extends StateNotifier<ComposeState> {
 
   Future<void> stackUp(String composeFilePath) async {
     try {
+      _trackedFilePaths.add(composeFilePath);
       await _cli.stackUp(composeFilePath);
       await refreshStacks(silent: true);
     } catch (e) {
@@ -88,6 +116,7 @@ class ComposeStacksNotifier extends StateNotifier<ComposeState> {
 
   Future<void> stackDown(String composeFilePath) async {
     try {
+      _trackedFilePaths.add(composeFilePath);
       await _cli.stackDown(composeFilePath);
       await refreshStacks(silent: true);
     } catch (e) {
@@ -98,6 +127,7 @@ class ComposeStacksNotifier extends StateNotifier<ComposeState> {
 
   Future<void> stackRestart(String composeFilePath) async {
     try {
+      _trackedFilePaths.add(composeFilePath);
       await _cli.stackRestart(composeFilePath);
       await refreshStacks(silent: true);
     } catch (e) {
@@ -109,6 +139,7 @@ class ComposeStacksNotifier extends StateNotifier<ComposeState> {
   Future<void> removeStack(String composeFilePath, {bool removeVolumes = true}) async {
     try {
       await _cli.removeStack(composeFilePath, removeVolumes: removeVolumes);
+      _trackedFilePaths.remove(composeFilePath);
       await refreshStacks(silent: true);
     } catch (e) {
       state = state.copyWith(error: e.toString());
@@ -119,6 +150,7 @@ class ComposeStacksNotifier extends StateNotifier<ComposeState> {
   Future<String> createStack(String dirPath, String filename, String yamlContent, {bool startNow = true}) async {
     try {
       final path = await _cli.createStack(dirPath, filename, yamlContent, startNow: startNow);
+      _trackedFilePaths.add(path);
       await refreshStacks(silent: true);
       return path;
     } catch (e) {
