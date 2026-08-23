@@ -53,6 +53,7 @@ class ComposeStacksNotifier extends StateNotifier<ComposeState> {
 
   Future<void> _init() async {
     final installed = await _cli.isComposeInstalled();
+    if (!mounted) return;
     if (!installed) {
       state = ComposeState(
         stacks: [],
@@ -67,11 +68,13 @@ class ComposeStacksNotifier extends StateNotifier<ComposeState> {
   }
 
   Future<void> refreshStacks({bool silent = false}) async {
+    if (!mounted) return;
     if (!silent) {
       state = state.copyWith(isLoading: true, error: null);
     }
     try {
       final activeList = await _cli.listStacks();
+      if (!mounted) return;
 
       // Track active stack paths
       for (final s in activeList) {
@@ -99,6 +102,7 @@ class ComposeStacksNotifier extends StateNotifier<ComposeState> {
 
       state = state.copyWith(stacks: combined, isLoading: false, error: null);
     } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
@@ -107,9 +111,13 @@ class ComposeStacksNotifier extends StateNotifier<ComposeState> {
     try {
       _trackedFilePaths.add(composeFilePath);
       await _cli.stackUp(composeFilePath);
-      await refreshStacks(silent: true);
+      if (mounted) {
+        await refreshStacks(silent: true);
+      }
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      if (mounted) {
+        state = state.copyWith(error: e.toString());
+      }
       rethrow;
     }
   }
@@ -118,9 +126,13 @@ class ComposeStacksNotifier extends StateNotifier<ComposeState> {
     try {
       _trackedFilePaths.add(composeFilePath);
       await _cli.stackDown(composeFilePath);
-      await refreshStacks(silent: true);
+      if (mounted) {
+        await refreshStacks(silent: true);
+      }
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      if (mounted) {
+        state = state.copyWith(error: e.toString());
+      }
       rethrow;
     }
   }
@@ -129,9 +141,13 @@ class ComposeStacksNotifier extends StateNotifier<ComposeState> {
     try {
       _trackedFilePaths.add(composeFilePath);
       await _cli.stackRestart(composeFilePath);
-      await refreshStacks(silent: true);
+      if (mounted) {
+        await refreshStacks(silent: true);
+      }
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      if (mounted) {
+        state = state.copyWith(error: e.toString());
+      }
       rethrow;
     }
   }
@@ -140,9 +156,13 @@ class ComposeStacksNotifier extends StateNotifier<ComposeState> {
     try {
       await _cli.removeStack(composeFilePath, removeVolumes: removeVolumes);
       _trackedFilePaths.remove(composeFilePath);
-      await refreshStacks(silent: true);
+      if (mounted) {
+        await refreshStacks(silent: true);
+      }
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      if (mounted) {
+        state = state.copyWith(error: e.toString());
+      }
       rethrow;
     }
   }
@@ -151,10 +171,14 @@ class ComposeStacksNotifier extends StateNotifier<ComposeState> {
     try {
       final path = await _cli.createStack(dirPath, filename, yamlContent, startNow: startNow);
       _trackedFilePaths.add(path);
-      await refreshStacks(silent: true);
+      if (mounted) {
+        await refreshStacks(silent: true);
+      }
       return path;
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      if (mounted) {
+        state = state.copyWith(error: e.toString());
+      }
       rethrow;
     }
   }

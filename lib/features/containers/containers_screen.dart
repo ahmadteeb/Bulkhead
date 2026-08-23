@@ -44,6 +44,128 @@ class _ContainersScreenState extends ConsumerState<ContainersScreen> {
     });
   }
 
+  void _showRunContainerDialog(BuildContext context, WidgetRef ref) {
+    final nameCtrl = TextEditingController(text: 'my_app_container');
+    final imageCtrl = TextEditingController(text: 'nginx:alpine');
+    final portCtrl = TextEditingController(text: '8080:80');
+    final envCtrl = TextEditingController(text: 'ENV_VAR=value');
+    bool autoStart = true;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setStateDialog) => AlertDialog(
+          backgroundColor: AppColors.cardBg(context),
+          title: const Row(
+            children: [
+              Icon(Icons.inventory_2_outlined, size: 22),
+              SizedBox(width: 10),
+              Text('Run New Container'),
+            ],
+          ),
+          content: SizedBox(
+            width: 480,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Container Name',
+                    hintText: 'e.g. my_web_app',
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: imageCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Image Name & Tag',
+                    hintText: 'e.g. nginx:alpine, ubuntu:latest, postgres:16',
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: portCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Port Mapping (HostPort:ContainerPort)',
+                    hintText: 'e.g. 8080:80, 5432:5432',
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: envCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Environment Variables',
+                    hintText: 'e.g. PORT=8080 or KEY=VAL',
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Checkbox(
+                      value: autoStart,
+                      onChanged: (val) => setStateDialog(() => autoStart = val ?? true),
+                    ),
+                    const Text('Start container immediately'),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final name = nameCtrl.text.trim();
+                final image = imageCtrl.text.trim();
+                final port = portCtrl.text.trim();
+                final envText = envCtrl.text.trim();
+
+                if (name.isNotEmpty && image.isNotEmpty) {
+                  Map<String, String>? ports;
+                  if (port.contains(':')) {
+                    final parts = port.split(':');
+                    ports = {parts[1]: parts[0]};
+                  }
+
+                  List<String>? env;
+                  if (envText.isNotEmpty) {
+                    env = [envText];
+                  }
+
+                  try {
+                    await ref.read(containersNotifierProvider.notifier).createContainer(
+                          name: name,
+                          image: image,
+                          portMappings: ports,
+                          env: env,
+                          autoStart: autoStart,
+                        );
+                    if (ctx.mounted) Navigator.of(ctx).pop();
+                  } catch (e) {
+                    if (ctx.mounted) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        SnackBar(content: Text('Failed to run container: $e'), backgroundColor: AppColors.error),
+                      );
+                    }
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
+              ),
+              child: const Text('Run Container'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final containersState = ref.watch(containersNotifierProvider);
@@ -51,7 +173,6 @@ class _ContainersScreenState extends ConsumerState<ContainersScreen> {
     final activeFilter = ref.watch(containerFilterStateProvider);
 
     final primaryColor = Theme.of(context).colorScheme.primary;
-    final onSurfaceColor = Theme.of(context).colorScheme.onSurface;
     final mutedTextColor = Theme.of(context).textTheme.bodySmall?.color;
     final variantTextColor = Theme.of(context).colorScheme.onSurfaceVariant;
 
@@ -84,15 +205,13 @@ class _ContainersScreenState extends ConsumerState<ContainersScreen> {
                 ],
               );
 
-              final refreshBtn = ElevatedButton.icon(
-                onPressed: () {
-                  ref.read(containersNotifierProvider.notifier).refreshContainers();
-                },
-                icon: const Icon(Icons.refresh, size: 18),
-                label: Text(isNarrow ? '' : 'Refresh'),
+              final actions = ElevatedButton.icon(
+                onPressed: () => _showRunContainerDialog(context, ref),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Run Container'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.containerLow(context),
-                  foregroundColor: onSurfaceColor,
+                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                  foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
                   elevation: 0,
                 ),
               );
@@ -103,7 +222,7 @@ class _ContainersScreenState extends ConsumerState<ContainersScreen> {
                   children: [
                     titleSection,
                     const SizedBox(height: 12),
-                    refreshBtn,
+                    actions,
                   ],
                 );
               }
@@ -111,7 +230,7 @@ class _ContainersScreenState extends ConsumerState<ContainersScreen> {
               return Row(
                 children: [
                   Expanded(child: titleSection),
-                  refreshBtn,
+                  actions,
                 ],
               );
             },

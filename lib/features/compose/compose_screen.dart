@@ -175,7 +175,6 @@ services:
     final composeState = ref.watch(composeStacksNotifierProvider);
 
     final onSurfaceColor = Theme.of(context).colorScheme.onSurface;
-    final containerLowColor = AppColors.containerLow(context);
     final primaryContainerColor = Theme.of(context).colorScheme.primaryContainer;
     final onPrimaryContainerColor = Theme.of(context).colorScheme.onPrimaryContainer;
     final mutedTextColor = Theme.of(context).textTheme.bodySmall?.color;
@@ -210,33 +209,15 @@ services:
                 ],
               );
 
-              final actionButtons = Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: () => _showNewStackDialog(context),
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Deploy Stack'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryContainerColor,
-                      foregroundColor: onPrimaryContainerColor,
-                      elevation: 0,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      ref.read(composeStacksNotifierProvider.notifier).refreshStacks();
-                    },
-                    icon: const Icon(Icons.refresh, size: 18),
-                    label: Text(isNarrow ? '' : 'Refresh Stacks'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: containerLowColor,
-                      foregroundColor: onSurfaceColor,
-                      elevation: 0,
-                    ),
-                  ),
-                ],
+              final actionButtons = ElevatedButton.icon(
+                onPressed: () => _showNewStackDialog(context),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Deploy Stack'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryContainerColor,
+                  foregroundColor: onPrimaryContainerColor,
+                  elevation: 0,
+                ),
               );
 
               if (isNarrow) {

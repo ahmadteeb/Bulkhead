@@ -38,6 +38,59 @@ class DockerApiClient {
     return decoded.map((item) => ContainerModel.fromJson(item as Map<String, dynamic>)).toList();
   }
 
+  /// Create and start a container (`POST /containers/create`)
+  Future<String> createContainer({
+    required String name,
+    required String image,
+    List<String>? env,
+    Map<String, String>? portMappings,
+    bool autoStart = true,
+  }) async {
+    final portBindings = <String, dynamic>{};
+    final exposedPorts = <String, dynamic>{};
+
+    if (portMappings != null) {
+      portMappings.forEach((containerPort, hostPort) {
+        final key = containerPort.contains('/') ? containerPort : '$containerPort/tcp';
+        exposedPorts[key] = {};
+        portBindings[key] = [
+          {'HostPort': hostPort}
+        ];
+      });
+    }
+
+    final bodyMap = <String, dynamic>{
+      'Image': image,
+      'ExposedPorts': exposedPorts,
+      'HostConfig': {
+        'PortBindings': portBindings,
+        'RestartPolicy': {'Name': 'unless-stopped'},
+      },
+    };
+    if (env != null && env.isNotEmpty) {
+      bodyMap['Env'] = env;
+    }
+
+    final body = jsonEncode(bodyMap);
+    final res = await _socket.request(
+      method: 'POST',
+      path: '/containers/create?name=${Uri.encodeComponent(name)}',
+      body: body,
+    );
+
+    if (!res.isSuccess) {
+      throw Exception('Failed to create container: ${res.body}');
+    }
+
+    final map = jsonDecode(res.body) as Map<String, dynamic>;
+    final id = map['Id'] as String;
+
+    if (autoStart) {
+      await startContainer(id);
+    }
+    return id;
+  }
+
   /// Inspect a single container
   Future<Map<String, dynamic>> inspectContainer(String id) async {
     final res = await _socket.request(method: 'GET', path: '/containers/$id/json');
@@ -317,6 +370,21 @@ class DockerApiClient {
       throw Exception('Failed to get system df: ${res.body}');
     }
     return jsonDecode(res.body) as Map<String, dynamic>;
+  }
+
+  /// System Prune All (`docker system prune -a --volumes`)
+  Future<Map<String, dynamic>> systemPruneAll() async {
+    final containersRes = await _socket.request(method: 'POST', path: '/containers/prune');
+    final imagesRes = await _socket.request(method: 'POST', path: '/images/prune?all=1');
+    final volumesRes = await _socket.request(method: 'POST', path: '/volumes/prune');
+    final networksRes = await _socket.request(method: 'POST', path: '/networks/prune');
+
+    return {
+      'containers': containersRes.isSuccess ? jsonDecode(containersRes.body) : {},
+      'images': imagesRes.isSuccess ? jsonDecode(imagesRes.body) : {},
+      'volumes': volumesRes.isSuccess ? jsonDecode(volumesRes.body) : {},
+      'networks': networksRes.isSuccess ? jsonDecode(networksRes.body) : {},
+    };
   }
 
   /// Real-time event stream (`/events`)

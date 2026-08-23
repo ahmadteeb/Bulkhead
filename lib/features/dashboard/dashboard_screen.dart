@@ -9,6 +9,7 @@ import '../../providers/images_provider.dart';
 import '../../providers/networks_provider.dart';
 import '../../providers/volumes_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/confirm_dialog.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -71,7 +72,6 @@ class DashboardScreen extends ConsumerWidget {
 
     final primaryColor = Theme.of(context).colorScheme.primary;
     final primaryContainerColor = Theme.of(context).colorScheme.primaryContainer;
-    final onPrimaryContainerColor = Theme.of(context).colorScheme.onPrimaryContainer;
     final cardBgColor = AppColors.cardBg(context);
     final borderColor = AppColors.borderColor(context);
     final containerLowColor = AppColors.containerLow(context);
@@ -82,43 +82,85 @@ class DashboardScreen extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header
-          Row(
-            children: [
-              Expanded(
-                child: Column(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 650;
+              final titleSection = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Dashboard Overview',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Local Docker Engine status & system metrics',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              );
+
+              final actionButtons = Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final confirm = await ConfirmDialog.show(
+                        context,
+                        title: 'System Prune All',
+                        message: 'Remove all stopped containers, unused networks, dangling images, and volumes?',
+                        confirmLabel: 'Prune System',
+                        isDestructive: true,
+                      );
+                      if (confirm == true && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Pruning Docker system artifacts...')),
+                        );
+                        final client = ref.read(dockerApiClientProvider);
+                        await client.systemPruneAll();
+                        ref.read(containersNotifierProvider.notifier).refreshContainers();
+                        ref.read(imagesNotifierProvider.notifier).refreshImages();
+                        ref.read(volumesNotifierProvider.notifier).refreshVolumes();
+                        ref.read(networksNotifierProvider.notifier).refreshNetworks();
+                        ref.invalidate(systemDfProvider);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('System Prune complete! All unused resources cleaned.'),
+                              backgroundColor: AppColors.success,
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.cleaning_services_outlined, size: 18),
+                    label: const Text('Prune System'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.error,
+                      side: BorderSide(color: AppColors.borderColor(context)),
+                    ),
+                  ),
+                ],
+              );
+
+              if (isNarrow) {
+                return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Dashboard Overview',
-                      style: Theme.of(context).textTheme.headlineMedium,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Local Docker Engine status & system metrics',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
+                    titleSection,
+                    const SizedBox(height: 12),
+                    actionButtons,
                   ],
-                ),
-              ),
-              ElevatedButton.icon(
-                onPressed: () {
-                  ref.read(connectionStatusProvider.notifier).checkConnection();
-                  ref.read(containersNotifierProvider.notifier).refreshContainers();
-                  ref.read(imagesNotifierProvider.notifier).refreshImages();
-                  ref.read(volumesNotifierProvider.notifier).refreshVolumes();
-                  ref.read(networksNotifierProvider.notifier).refreshNetworks();
-                  ref.invalidate(systemDfProvider);
-                },
-                icon: const Icon(Icons.refresh, size: 18),
-                label: const Text('Refresh System'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryContainerColor,
-                  foregroundColor: onPrimaryContainerColor,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-              ),
-            ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(child: titleSection),
+                  actionButtons,
+                ],
+              );
+            },
           ),
           const SizedBox(height: 24),
 

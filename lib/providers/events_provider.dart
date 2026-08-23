@@ -31,14 +31,14 @@ class DockerEventsNotifier extends StateNotifier<List<DockerEventModel>> {
   }
 
   void _subscribe() {
-    if (_isDisposed) return;
+    if (_isDisposed || !mounted) return;
     _sub?.cancel();
 
     try {
       final stream = _client.streamEvents();
       _sub = stream.listen(
         (event) {
-          if (_isDisposed) return;
+          if (_isDisposed || !mounted) return;
           state = [event, ...state.take(49)];
 
           // 100% Real-Time Auto Refresh across ALL providers on ANY Docker Engine event
@@ -62,9 +62,9 @@ class DockerEventsNotifier extends StateNotifier<List<DockerEventModel>> {
   }
 
   void _scheduleReconnect() {
-    if (_isDisposed) return;
+    if (_isDisposed || !mounted) return;
     Future.delayed(const Duration(seconds: 2), () {
-      if (!_isDisposed) {
+      if (!_isDisposed && mounted) {
         _subscribe();
       }
     });

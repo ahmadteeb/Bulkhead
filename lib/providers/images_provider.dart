@@ -55,13 +55,16 @@ class ImagesNotifier extends StateNotifier<ImagesState> {
   }
 
   Future<void> refreshImages({bool silent = false}) async {
+    if (!mounted) return;
     if (!silent) {
       state = state.copyWith(isLoading: true, error: null);
     }
     try {
       final list = await _client.getImages(showAll: true);
+      if (!mounted) return;
       state = ImagesState(images: list, isLoading: false, error: null);
     } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
@@ -69,9 +72,13 @@ class ImagesNotifier extends StateNotifier<ImagesState> {
   Future<void> removeImage(String id, {bool force = false}) async {
     try {
       await _client.removeImage(id, force: force);
-      await refreshImages(silent: true);
+      if (mounted) {
+        await refreshImages(silent: true);
+      }
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      if (mounted) {
+        state = state.copyWith(error: e.toString());
+      }
       rethrow;
     }
   }
@@ -79,7 +86,9 @@ class ImagesNotifier extends StateNotifier<ImagesState> {
   Future<Map<String, dynamic>> pruneImages() async {
     try {
       final res = await _client.pruneImages();
-      await refreshImages(silent: true);
+      if (mounted) {
+        await refreshImages(silent: true);
+      }
       return res;
     } catch (e) {
       return {'Error': e.toString()};

@@ -56,13 +56,16 @@ class VolumesNotifier extends StateNotifier<VolumesState> {
   }
 
   Future<void> refreshVolumes({bool silent = false}) async {
+    if (!mounted) return;
     if (!silent) {
       state = state.copyWith(isLoading: true, error: null);
     }
     try {
       final list = await _client.getVolumes();
+      if (!mounted) return;
       state = VolumesState(volumes: list, isLoading: false, error: null);
     } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
@@ -70,9 +73,13 @@ class VolumesNotifier extends StateNotifier<VolumesState> {
   Future<void> createVolume(String name) async {
     try {
       await _client.createVolume(name);
-      await refreshVolumes(silent: true);
+      if (mounted) {
+        await refreshVolumes(silent: true);
+      }
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      if (mounted) {
+        state = state.copyWith(error: e.toString());
+      }
       rethrow;
     }
   }
@@ -80,9 +87,13 @@ class VolumesNotifier extends StateNotifier<VolumesState> {
   Future<void> removeVolume(String name, {bool force = false}) async {
     try {
       await _client.removeVolume(name, force: force);
-      await refreshVolumes(silent: true);
+      if (mounted) {
+        await refreshVolumes(silent: true);
+      }
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      if (mounted) {
+        state = state.copyWith(error: e.toString());
+      }
       rethrow;
     }
   }
@@ -90,7 +101,9 @@ class VolumesNotifier extends StateNotifier<VolumesState> {
   Future<Map<String, dynamic>> pruneVolumes() async {
     try {
       final res = await _client.pruneVolumes();
-      await refreshVolumes(silent: true);
+      if (mounted) {
+        await refreshVolumes(silent: true);
+      }
       return res;
     } catch (e) {
       return {'Error': e.toString()};

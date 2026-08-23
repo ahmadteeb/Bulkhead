@@ -56,13 +56,16 @@ class NetworksNotifier extends StateNotifier<NetworksState> {
   }
 
   Future<void> refreshNetworks({bool silent = false}) async {
+    if (!mounted) return;
     if (!silent) {
       state = state.copyWith(isLoading: true, error: null);
     }
     try {
       final list = await _client.getNetworks();
+      if (!mounted) return;
       state = NetworksState(networks: list, isLoading: false, error: null);
     } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
@@ -70,9 +73,13 @@ class NetworksNotifier extends StateNotifier<NetworksState> {
   Future<void> createNetwork(String name, {String driver = 'bridge'}) async {
     try {
       await _client.createNetwork(name, driver: driver);
-      await refreshNetworks(silent: true);
+      if (mounted) {
+        await refreshNetworks(silent: true);
+      }
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      if (mounted) {
+        state = state.copyWith(error: e.toString());
+      }
       rethrow;
     }
   }
@@ -80,9 +87,13 @@ class NetworksNotifier extends StateNotifier<NetworksState> {
   Future<void> removeNetwork(String id) async {
     try {
       await _client.removeNetwork(id);
-      await refreshNetworks(silent: true);
+      if (mounted) {
+        await refreshNetworks(silent: true);
+      }
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      if (mounted) {
+        state = state.copyWith(error: e.toString());
+      }
       rethrow;
     }
   }

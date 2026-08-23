@@ -108,23 +108,57 @@ class ContainersNotifier extends StateNotifier<ContainersState> {
   }
 
   Future<void> refreshContainers({bool silent = false}) async {
+    if (!mounted) return;
     if (!silent) {
       state = state.copyWith(isLoading: true, error: null);
     }
     try {
       final list = await _client.getContainers(showAll: true);
+      if (!mounted) return;
       state = ContainersState(containers: list, isLoading: false, error: null);
     } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
+    }
+  }
+
+  Future<String> createContainer({
+    required String name,
+    required String image,
+    List<String>? env,
+    Map<String, String>? portMappings,
+    bool autoStart = true,
+  }) async {
+    try {
+      final id = await _client.createContainer(
+        name: name,
+        image: image,
+        env: env,
+        portMappings: portMappings,
+        autoStart: autoStart,
+      );
+      if (mounted) {
+        await refreshContainers(silent: true);
+      }
+      return id;
+    } catch (e) {
+      if (mounted) {
+        state = state.copyWith(error: e.toString());
+      }
+      rethrow;
     }
   }
 
   Future<void> startContainer(String id) async {
     try {
       await _client.startContainer(id);
-      await refreshContainers(silent: true);
+      if (mounted) {
+        await refreshContainers(silent: true);
+      }
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      if (mounted) {
+        state = state.copyWith(error: e.toString());
+      }
       rethrow;
     }
   }
@@ -132,9 +166,13 @@ class ContainersNotifier extends StateNotifier<ContainersState> {
   Future<void> stopContainer(String id) async {
     try {
       await _client.stopContainer(id);
-      await refreshContainers(silent: true);
+      if (mounted) {
+        await refreshContainers(silent: true);
+      }
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      if (mounted) {
+        state = state.copyWith(error: e.toString());
+      }
       rethrow;
     }
   }
@@ -142,9 +180,13 @@ class ContainersNotifier extends StateNotifier<ContainersState> {
   Future<void> restartContainer(String id) async {
     try {
       await _client.restartContainer(id);
-      await refreshContainers(silent: true);
+      if (mounted) {
+        await refreshContainers(silent: true);
+      }
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      if (mounted) {
+        state = state.copyWith(error: e.toString());
+      }
       rethrow;
     }
   }
@@ -152,9 +194,13 @@ class ContainersNotifier extends StateNotifier<ContainersState> {
   Future<void> removeContainer(String id, {bool force = false}) async {
     try {
       await _client.removeContainer(id, force: force);
-      await refreshContainers(silent: true);
+      if (mounted) {
+        await refreshContainers(silent: true);
+      }
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      if (mounted) {
+        state = state.copyWith(error: e.toString());
+      }
       rethrow;
     }
   }

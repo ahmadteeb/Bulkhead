@@ -46,6 +46,7 @@ class ConnectionStatusNotifier extends StateNotifier<ConnectionStatusState> {
   Future<void> checkConnection() async {
     try {
       final ok = await _client.ping();
+      if (!mounted) return;
       if (ok) {
         state = ConnectionStatusState(status: ConnectionStateEnum.connected);
       } else {
@@ -55,16 +56,19 @@ class ConnectionStatusNotifier extends StateNotifier<ConnectionStatusState> {
         );
       }
     } on DockerPermissionDeniedException catch (e) {
+      if (!mounted) return;
       state = ConnectionStatusState(
         status: ConnectionStateEnum.permissionDenied,
         errorMessage: e.message,
       );
     } on DockerSocketNotFoundException catch (e) {
+      if (!mounted) return;
       state = ConnectionStatusState(
         status: ConnectionStateEnum.socketNotFound,
         errorMessage: e.message,
       );
     } catch (e) {
+      if (!mounted) return;
       state = ConnectionStatusState(
         status: ConnectionStateEnum.error,
         errorMessage: e.toString(),
