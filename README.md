@@ -12,6 +12,10 @@
   <a href="https://github.com/ahmadteeb/Bulkhead/releases"><img src="https://img.shields.io/github/v/release/ahmadteeb/Bulkhead?color=FF6F00&logo=github" alt="GitHub Release" /></a>
 </p>
 
+<p align="center">
+  <a href="https://www.buymeacoffee.com/ahmadteeb"><img src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=&slug=ahmadteeb&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" /></a>
+</p>
+
 **Bulkhead** is a state-of-the-art desktop Linux Docker Engine manager built with **Flutter Desktop**. It provides high-performance, real-time container administration, multi-container Compose stack management, local image registry inspection, persistent volume control, virtual network topology visualization, embedded interactive terminal emulation, container volume file browsing with upload/download capabilities, and single-click system storage optimization.
 
 ---
@@ -207,6 +211,14 @@ flutter build linux --release
 - **Socket I/O**: Custom `DockerSocketConnection` implementing HTTP/1.1 over Unix Domain Sockets (`Socket.connect(InternetAddress('/var/run/docker.sock', InternetAddressType.unix), 0)`).
 - **Stream Demuxing**: 8-byte multiplexing header demuxer parsing `stdout` (stream type `1`) and `stderr` (stream type `2`) from Docker container log streams.
 - **Typography**: Google Fonts (`Hanken Grotesk` headings, `JetBrains Mono` telemetry).
+
+---
+
+## ☕ Support & Donate
+
+If you find **Bulkhead** useful and would like to support its ongoing development, consider buying me a coffee!
+
+<a href="https://www.buymeacoffee.com/ahmadteeb"><img src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=&slug=ahmadteeb&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" /></a>
 
 ---
 
