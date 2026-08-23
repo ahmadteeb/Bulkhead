@@ -12,7 +12,7 @@
   <a href="#-100-real-time-event-driven-architecture"><img src="https://img.shields.io/badge/Architecture-100%25%20Real--Time%20Event--Driven-FF6F00" alt="Architecture" /></a>
 </p>
 
-**Bulkhead** is a state-of-the-art desktop Linux Docker Engine manager built with **Flutter Desktop**. It provides high-performance, real-time container administration, multi-container Compose stack management, local image registry inspection, persistent volume control, virtual network topology visualization, and single-click system storage optimization.
+**Bulkhead** is a state-of-the-art desktop Linux Docker Engine manager built with **Flutter Desktop**. It provides high-performance, real-time container administration, multi-container Compose stack management, local image registry inspection, persistent volume control, virtual network topology visualization, embedded interactive terminal emulation, container volume file browsing with upload/download capabilities, and single-click system storage optimization.
 
 ---
 
@@ -20,11 +20,11 @@
 
 - ⚡ **100% Real-Time Event-Driven (Zero Polling Overhead)**: Listens continuously to the Docker Engine socket stream (`/events`) to instantly refresh containers, images, volumes, networks, and compose stacks without background timers or screen flickering.
 - 🔌 **Direct Native Unix Socket Connection**: Connects directly to `/var/run/docker.sock` over Unix domain sockets using HTTP/1.1 chunked response demuxing, bypassing external daemon proxy layers.
+- 💻 **Embedded Interactive Container Terminal (`xterm`)**: Native terminal emulator with PTY allocation (`script` wrapper), shell selector (`/bin/bash`, `/bin/sh`, `zsh`, `ash`), ANSI escape code stripping, normalized `\r\n` line endings, right-click context menu (**Copy Output**, **Paste Stdin**), and external terminal launcher.
+- 📁 **Container Volume File Browser & File Manager**: Explore container volumes, root file systems, and bind mounts. Features **Back (`<`)** & **Forward (`>`)** directory history navigation, **Upload File** (`docker cp`), and **Download File/Folder** to host system folders. Accessible from container details and the Volumes page.
 - 🚀 **Full Docker Compose CLI Integration**: Manage multi-container application stacks (`docker compose up -d`, `down`, `restart`, `down -v --remove-orphans`). Includes a Deploy Stack wizard with an inline `docker-compose.yml` editor.
 - 📦 **Multi-Selection & Bulk Actions**: Select multiple containers, images, volumes, or networks with Select-All header checkboxes to perform batch operations (Start, Stop, Restart, Delete).
-- 💻 **Interactive Container Exec Terminal**: Execute shell commands (`sh`, `bash`, `env`, `ls -la`, `cat`, `ps`) directly inside running containers from the GUI.
-- 📁 **Container Volume File Browser**: Interactively explore files and directories mounted inside container volumes or local storage paths.
-- 📜 **Dual-Mode Log Telemetry & Demuxing**: Real-time stdout/stderr log streaming supporting both TTY and non-TTY multiplexed stream frames with auto-scrolling.
+- 📜 **Dual-Mode Log Telemetry & Demuxing**: Real-time stdout/stderr log streaming supporting both TTY and non-TTY multiplexed stream frames with auto-scrolling and log text copying.
 - 🏷️ **Unified Status Badge System**: Standardized status badge colors (`AppColors.success` green for all running stack & container states) and responsive sizing across all screens.
 - 🧹 **1-Click Storage Optimization**: Dynamic progress bars calculated from `docker system df` metrics with a single-click **System Prune All** button to reclaim unused disk space.
 - 🎨 **Modern Dark & Light Themes**: Dark mode interface designed according to `#111316` surface specifications, paired with crisp `Hanken Grotesk` headings and `JetBrains Mono` code telemetry.
@@ -47,8 +47,8 @@ Monitor and filter container instances (All, Running, Stopped). Perform multi-se
 
 ---
 
-### 🔍 3. Container Details, Real-Time Logs & Exec Terminal
-Deep dive into container telemetry with stdout/stderr log streaming, **Interactive Exec Terminal**, **Volume File Browser**, raw Docker inspect JSON view, environment variables, port mappings, and host volume mounts.
+### 💻 3. Embedded Interactive Terminal & Container Telemetry
+Deep dive into container telemetry with stdout/stderr log streaming, **Embedded Exec Terminal** (`xterm` with TTY shell selection and right-click copy/paste), **Volume File Browser**, raw Docker inspect JSON view, environment variables, port mappings, and host volume mounts.
 
 ![Container Detail & Telemetry](screenshots/container_detail.png)
 
@@ -68,8 +68,8 @@ Inspect locally stored Docker images, view repository tags and sizes, execute **
 
 ---
 
-### 💾 6. Volume Storage Points
-Manage persistent storage volumes, inspect host mountpoints and drivers, create new volumes, prune unused volume points, and perform multi-selection deletion.
+### 💾 6. Volume Storage Points & File Explorer
+Manage persistent storage volumes, inspect host mountpoints and drivers, browse attached volume file systems with **Back/Forward** history and **Upload/Download** options, create new volumes, prune unused volume points, and perform multi-selection deletion.
 
 ![Volume Storage Points](screenshots/volumes.png)
 
@@ -95,10 +95,12 @@ Configure local Docker Unix domain socket paths (`/var/run/docker.sock`), test s
 |---|---|
 | **Real-Time Engine Sync** | 100% event-driven sync via `/events` socket stream; zero polling timers. |
 | **Containers** | List, filter, start, stop, restart, remove, multi-select bulk actions, run new container modal. |
-| **Container Telemetry** | Dual-mode stdout/stderr live logs, Interactive Exec Terminal, Volume File Browser, Raw Inspect JSON. |
-| **Compose Stacks** | List stacks, Up/Down/Restart/Delete, Deploy Stack wizard, inline YAML editor, service log stream, green status badges. |
+| **Interactive Terminal** | `xterm: ^4.0.0` emulator, Linux PTY allocation (`script`), `/bin/bash`/`/bin/sh`/`zsh` shells, right-click context menu, clean ANSI escape filter, external terminal launcher. |
+| **Volume File Manager** | Browse attached container volumes & host mountpoints, Back/Forward navigation stack, Upload host files (`docker cp`), Download files & directories (`docker cp`). |
+| **Container Telemetry** | Dual-mode stdout/stderr live logs, raw Inspect JSON viewer, environment variable table, port mapping table. |
+| **Compose Stacks** | List stacks, Up/Down/Restart/Delete, Deploy Stack wizard, inline YAML editor, service log stream, unified green status badges. |
 | **Images** | Inspect tags/sizes, Pull Image modal with terminal progress, Run Container from Image, Prune unused images. |
-| **Volumes** | List mountpoints, create volume modal, remove, multi-select delete, Prune unused volumes, File Browser. |
+| **Volumes** | List mountpoints, create volume modal, remove, multi-select delete, Prune unused volumes, integrated File Browser. |
 | **Networks** | List network topology, driver selector (`bridge`, `host`, `overlay`, `macvlan`), subnet/gateway inspector. |
 | **Storage Optimization** | Dynamic `docker system df` usage bars, 1-click **Prune System** (`docker system prune -a --volumes`). |
 
@@ -146,6 +148,8 @@ flutter build linux --release
 
 - **UI Framework**: Flutter Desktop (Linux X11/Wayland GTK runner).
 - **State Management**: Riverpod 2.x (`StateNotifierProvider`, `StreamProvider`, `FutureProvider`).
+- **Terminal Emulator**: `xterm: ^4.0.0` with Linux PTY pseudo-terminal allocation (`script -q -c "docker exec -it ..."`).
+- **File Manager**: `file_picker` package paired with `docker cp` process execution.
 - **Socket I/O**: Custom `DockerSocketConnection` implementing HTTP/1.1 over Unix Domain Sockets (`Socket.connect(InternetAddress('/var/run/docker.sock', InternetAddressType.unix), 0)`).
 - **Stream Demuxing**: 8-byte multiplexing header demuxer parsing `stdout` (stream type `1`) and `stderr` (stream type `2`) from Docker container log streams.
 - **Typography**: Google Fonts (`Hanken Grotesk` headings, `JetBrains Mono` telemetry).
