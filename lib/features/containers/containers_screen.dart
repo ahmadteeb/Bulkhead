@@ -8,6 +8,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/data_table_shell.dart';
 import '../../widgets/status_badge.dart';
+import 'container_detail_screen.dart';
 
 class ContainersScreen extends ConsumerStatefulWidget {
   final ValueChanged<ContainerModel> onSelectContainer;
@@ -343,11 +344,11 @@ class _ContainersScreenState extends ConsumerState<ContainersScreen> {
                 ),
               ),
               columns: const [
-                DataTableColumnSpec(title: 'Status', width: 140),
+                DataTableColumnSpec(title: 'Status', width: 160),
                 DataTableColumnSpec(title: 'Container Name', flex: true),
                 DataTableColumnSpec(title: 'Image', flex: true),
                 DataTableColumnSpec(title: 'Port Mappings', width: 180),
-                DataTableColumnSpec(title: 'Actions', width: 180),
+                DataTableColumnSpec(title: 'Actions', width: 210),
               ],
               itemCount: filteredContainers.length,
               rowBuilder: (context, index) {
@@ -375,8 +376,11 @@ class _ContainersScreenState extends ConsumerState<ContainersScreen> {
 
                         // Status
                         SizedBox(
-                          width: 140,
-                          child: StatusBadge.fromState(container.state),
+                          width: 160,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: StatusBadge.fromState(container.state),
+                          ),
                         ),
 
                         // Name + ID
@@ -431,10 +435,15 @@ class _ContainersScreenState extends ConsumerState<ContainersScreen> {
 
                         // Actions
                         SizedBox(
-                          width: 180,
+                          width: 210,
                           child: Row(
                             children: [
-                              if (container.state == 'running')
+                              if (container.state == 'running') ...[
+                                IconButton(
+                                  icon: Icon(Icons.terminal, size: 20, color: Theme.of(context).colorScheme.primaryContainer),
+                                  tooltip: 'Open Interactive Container Terminal',
+                                  onPressed: () => launchNativeContainerTerminal(container.id),
+                                ),
                                 IconButton(
                                   icon: const Icon(Icons.pause_circle_outline, size: 20, color: AppColors.warning),
                                   tooltip: 'Stop Container',
@@ -451,8 +460,8 @@ class _ContainersScreenState extends ConsumerState<ContainersScreen> {
                                           .stopContainer(container.id);
                                     }
                                   },
-                                )
-                              else
+                                ),
+                              ] else
                                 IconButton(
                                   icon: const Icon(Icons.play_circle_outline, size: 20, color: AppColors.success),
                                   tooltip: 'Start Container',

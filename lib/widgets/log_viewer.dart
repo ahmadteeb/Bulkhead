@@ -164,9 +164,6 @@ class _LogViewerState extends State<LogViewer> {
                   tooltip: 'Copy Logs',
                   onPressed: () {
                     Clipboard.setData(ClipboardData(text: widget.logs.join('\n')));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Logs copied to clipboard')),
-                    );
                   },
                 ),
                 if (widget.onClear != null)

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Bulkhead
+Comment=Flutter Docker Engine Manager for Linux
+Exec=bulkhead
+Icon=bulkhead
+Terminal=false
+Type=Application
+Categories=Development;System;Utility;
+Keywords=docker;container;compose;podman;manager;

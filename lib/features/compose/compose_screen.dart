@@ -342,7 +342,7 @@ services:
                     isLoading: composeState.isLoading && composeState.stacks.isEmpty,
                     columns: const [
                       DataTableColumnSpec(title: 'Stack Name', width: 180),
-                      DataTableColumnSpec(title: 'Status', width: 140),
+                      DataTableColumnSpec(title: 'Status', width: 160),
                       DataTableColumnSpec(title: 'Compose File & Path', flex: true),
                       DataTableColumnSpec(title: 'Actions', width: 240),
                     ],

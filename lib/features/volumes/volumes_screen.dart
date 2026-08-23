@@ -1,8 +1,12 @@
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../models/volume_model.dart';
+import '../../providers/connection_status_provider.dart';
+import '../../providers/containers_provider.dart';
 import '../../providers/volumes_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/confirm_dialog.dart';
@@ -17,18 +21,6 @@ class VolumesScreen extends ConsumerStatefulWidget {
 
 class _VolumesScreenState extends ConsumerState<VolumesScreen> {
   final Set<String> _selectedNames = {};
-
-  String _formatBytes(int bytes) {
-    if (bytes <= 0) return '0 B';
-    const suffixes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    var i = 0;
-    double d = bytes.toDouble();
-    while (d >= 1024 && i < suffixes.length - 1) {
-      d /= 1024;
-      i++;
-    }
-    return '${d.toStringAsFixed(1)} ${suffixes[i]}';
-  }
 
   void _toggleSelectAll(List<VolumeModel> volumes, bool? value) {
     setState(() {
@@ -93,6 +85,38 @@ class _VolumesScreenState extends ConsumerState<VolumesScreen> {
     );
   }
 
+  void _showVolumeBrowserDialog(BuildContext context, WidgetRef ref, VolumeModel volume) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.cardBg(context),
+        title: Row(
+          children: [
+            Icon(Icons.folder_open, color: Theme.of(context).colorScheme.primaryContainer, size: 22),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Volume Files: ${volume.name}',
+                style: GoogleFonts.jetBrainsMono(fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 700,
+          height: 500,
+          child: _VolumeHostBrowserView(volume: volume),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final volumesState = ref.watch(volumesNotifierProvider);
@@ -117,7 +141,8 @@ class _VolumesScreenState extends ConsumerState<VolumesScreen> {
           // Header
           LayoutBuilder(
             builder: (context, constraints) {
-              final isNarrow = constraints.maxWidth < 750;
+              final isNarrow = constraints.maxWidth < 650;
+
               final titleSection = Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -127,7 +152,7 @@ class _VolumesScreenState extends ConsumerState<VolumesScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Persistent storage volumes for data preservation',
+                    'Manage persistent storage mountpoints & volumes',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
@@ -136,28 +161,33 @@ class _VolumesScreenState extends ConsumerState<VolumesScreen> {
               final actions = Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  ElevatedButton.icon(
+                    onPressed: () => _showCreateDialog(context, ref),
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Create Volume'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryContainerColor,
+                      foregroundColor: onPrimaryContainerColor,
+                      elevation: 0,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
                   OutlinedButton.icon(
                     onPressed: () async {
                       final confirm = await ConfirmDialog.show(
                         context,
                         title: 'Prune Unused Volumes',
-                        message: 'Remove all local volumes not in use by at least one container?',
-                        confirmLabel: 'Prune',
+                        message: 'Remove all unreferenced local storage volumes?',
+                        confirmLabel: 'Prune Volumes',
                         isDestructive: true,
                       );
                       if (confirm == true && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Pruning unused volumes...')),
-                        );
                         final res = await ref.read(volumesNotifierProvider.notifier).pruneVolumes();
-                        final reclaimed = res['SpaceReclaimed'] as int? ?? 0;
-                        final deleted = (res['VolumesDeleted'] as List?)?.length ?? 0;
                         if (context.mounted) {
+                          final count = (res['VolumesDeleted'] as List?)?.length ?? 0;
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text(
-                                'Prune complete! Removed $deleted volume(s), reclaimed ${_formatBytes(reclaimed)} space.',
-                              ),
+                              content: Text('Pruned $count unused volume(s).'),
                               backgroundColor: AppColors.success,
                             ),
                           );
@@ -169,17 +199,6 @@ class _VolumesScreenState extends ConsumerState<VolumesScreen> {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.error,
                       side: BorderSide(color: AppColors.borderColor(context)),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  ElevatedButton.icon(
-                    onPressed: () => _showCreateDialog(context, ref),
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Create Volume'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryContainerColor,
-                      foregroundColor: onPrimaryContainerColor,
-                      elevation: 0,
                     ),
                   ),
                 ],
@@ -259,7 +278,7 @@ class _VolumesScreenState extends ConsumerState<VolumesScreen> {
                 DataTableColumnSpec(title: 'Volume Name', flex: true),
                 DataTableColumnSpec(title: 'Driver', width: 120),
                 DataTableColumnSpec(title: 'Mountpoint Path', flex: true),
-                DataTableColumnSpec(title: 'Actions', width: 100),
+                DataTableColumnSpec(title: 'Actions', width: 140),
               ],
               itemCount: filteredVolumes.length,
               rowBuilder: (context, index) {
@@ -319,24 +338,34 @@ class _VolumesScreenState extends ConsumerState<VolumesScreen> {
 
                       // Actions
                       SizedBox(
-                        width: 100,
-                        child: IconButton(
-                          icon: const Icon(Icons.delete_outline, color: AppColors.error, size: 20),
-                          tooltip: 'Remove Volume',
-                          onPressed: () async {
-                            final confirm = await ConfirmDialog.show(
-                              context,
-                              title: 'Remove Volume',
-                              message: 'Permanently remove volume "${vol.name}"?',
-                              confirmLabel: 'Remove',
-                              isDestructive: true,
-                            );
-                            if (confirm == true) {
-                              await ref
-                                  .read(volumesNotifierProvider.notifier)
-                                  .removeVolume(vol.name, force: true);
-                            }
-                          },
+                        width: 140,
+                        child: Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.folder_open, size: 20),
+                              color: Theme.of(context).colorScheme.primaryContainer,
+                              tooltip: 'Browse Volume Files',
+                              onPressed: () => _showVolumeBrowserDialog(context, ref, vol),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, color: AppColors.error, size: 20),
+                              tooltip: 'Remove Volume',
+                              onPressed: () async {
+                                final confirm = await ConfirmDialog.show(
+                                  context,
+                                  title: 'Remove Volume',
+                                  message: 'Permanently remove volume "${vol.name}"?',
+                                  confirmLabel: 'Remove',
+                                  isDestructive: true,
+                                );
+                                if (confirm == true) {
+                                  await ref
+                                      .read(volumesNotifierProvider.notifier)
+                                      .removeVolume(vol.name, force: true);
+                                }
+                              },
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -347,6 +376,287 @@ class _VolumesScreenState extends ConsumerState<VolumesScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _VolumeHostBrowserView extends ConsumerStatefulWidget {
+  final VolumeModel volume;
+
+  const _VolumeHostBrowserView({required this.volume});
+
+  @override
+  ConsumerState<_VolumeHostBrowserView> createState() => _VolumeHostBrowserViewState();
+}
+
+class _VolumeHostBrowserViewState extends ConsumerState<_VolumeHostBrowserView> {
+  final TextEditingController _pathCtrl = TextEditingController(text: '/');
+  List<Map<String, String>> _files = [];
+  bool _isLoading = false;
+  String? _error;
+  String? _attachedContainerId;
+
+  final List<String> _history = ['/'];
+  int _historyIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _findContainerAndBrowse('/', pushHistory: false);
+  }
+
+  void _findContainerAndBrowse(String path, {bool pushHistory = true}) async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+      _pathCtrl.text = path;
+      if (pushHistory) {
+        if (_historyIndex < _history.length - 1) {
+          _history.removeRange(_historyIndex + 1, _history.length);
+        }
+        _history.add(path);
+        _historyIndex = _history.length - 1;
+      }
+    });
+
+    final client = ref.read(dockerApiClientProvider);
+    final containersState = ref.read(containersNotifierProvider);
+
+    // Find a running container attached to this volume
+    String? containerId = _attachedContainerId;
+    if (containerId == null) {
+      for (final c in containersState.containers) {
+        if (c.state == 'running') {
+          for (final m in c.mounts) {
+            if (m.name == widget.volume.name) {
+              containerId = c.id;
+              _attachedContainerId = c.id;
+              break;
+            }
+          }
+        }
+        if (containerId != null) break;
+      }
+    }
+
+    if (containerId != null) {
+      try {
+        final res = await client.listContainerFiles(containerId, path);
+        if (mounted) {
+          setState(() {
+            _files = res;
+            _isLoading = false;
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _error = e.toString();
+            _isLoading = false;
+          });
+        }
+      }
+    } else {
+      if (mounted) {
+        setState(() {
+          _error = 'No active container currently using volume "${widget.volume.name}".\n\nHost Mountpoint Path:\n${widget.volume.mountpoint}';
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _uploadFile() async {
+    if (_attachedContainerId == null) return;
+    try {
+      final files = await FilePicker.pickFiles();
+      if (files.isNotEmpty && files.first.path != null) {
+        final hostPath = files.first.path!;
+        final currentPath = _pathCtrl.text;
+        final shortId = _attachedContainerId!.length >= 12 ? _attachedContainerId!.substring(0, 12) : _attachedContainerId!;
+
+        final res = await Process.run('docker', ['cp', hostPath, '$shortId:$currentPath']);
+        if (mounted) {
+          if (res.exitCode == 0) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Uploaded ${files.first.name} successfully!'), backgroundColor: AppColors.success),
+            );
+            _findContainerAndBrowse(currentPath, pushHistory: false);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Upload failed: ${res.stderr}'), backgroundColor: AppColors.error),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Upload error: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
+  }
+
+  void _downloadItem(String fileName) async {
+    if (_attachedContainerId == null) return;
+    try {
+      final currentPath = _pathCtrl.text;
+      final remotePath = currentPath.endsWith('/') ? '$currentPath$fileName' : '$currentPath/$fileName';
+      final shortId = _attachedContainerId!.length >= 12 ? _attachedContainerId!.substring(0, 12) : _attachedContainerId!;
+
+      final String? targetDir = await FilePicker.getDirectoryPath();
+      if (targetDir == null) return; // User cancelled download dialog!
+
+      final res = await Process.run('docker', ['cp', '$shortId:$remotePath', '$targetDir/']);
+      if (mounted) {
+        if (res.exitCode == 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Downloaded $fileName to $targetDir!'), backgroundColor: AppColors.success),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Download failed: ${res.stderr}'), backgroundColor: AppColors.error),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Download error: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final borderColor = AppColors.borderColor(context);
+    final currentPath = _pathCtrl.text;
+    final canGoBack = _historyIndex > 0;
+    final canGoForward = _historyIndex < _history.length - 1;
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.arrow_back, size: 18),
+              tooltip: 'Go Back',
+              onPressed: canGoBack
+                  ? () {
+                      _historyIndex--;
+                      _findContainerAndBrowse(_history[_historyIndex], pushHistory: false);
+                    }
+                  : null,
+            ),
+            IconButton(
+              icon: const Icon(Icons.arrow_forward, size: 18),
+              tooltip: 'Go Forward',
+              onPressed: canGoForward
+                  ? () {
+                      _historyIndex++;
+                      _findContainerAndBrowse(_history[_historyIndex], pushHistory: false);
+                    }
+                  : null,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                controller: _pathCtrl,
+                onSubmitted: (val) => _findContainerAndBrowse(val),
+                decoration: const InputDecoration(
+                  labelText: 'Volume Internal Path',
+                  prefixIcon: Icon(Icons.folder_open, size: 18),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            ElevatedButton.icon(
+              onPressed: () => _findContainerAndBrowse(_pathCtrl.text),
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('Browse'),
+            ),
+            const SizedBox(width: 8),
+            ElevatedButton.icon(
+              onPressed: _attachedContainerId == null ? null : _uploadFile,
+              icon: const Icon(Icons.upload_file, size: 18),
+              label: const Text('Upload'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Expanded(
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.cardBg(context),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: borderColor),
+            ),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+                : _error != null
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: SelectableText(
+                            _error!,
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.jetBrainsMono(
+                              fontSize: 13,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      )
+                    : ListView.separated(
+                        itemCount: _files.length,
+                        separatorBuilder: (context, index) => Divider(height: 1, color: borderColor),
+                        itemBuilder: (context, idx) {
+                          final item = _files[idx];
+                          final isDir = item['isDir'] == 'true';
+                          final name = item['name'] ?? '';
+                          final perms = item['permissions'] ?? '';
+                          final size = item['size'] ?? '';
+
+                          return ListTile(
+                            leading: Icon(
+                              isDir ? Icons.folder : Icons.insert_drive_file,
+                              color: isDir
+                                  ? Theme.of(context).colorScheme.primaryContainer
+                                  : Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                            title: Text(name, style: GoogleFonts.jetBrainsMono(fontSize: 13, fontWeight: FontWeight.w600)),
+                            subtitle: Text('$perms • $size bytes', style: GoogleFonts.jetBrainsMono(fontSize: 11)),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.download, size: 18),
+                                  tooltip: 'Download File/Folder to Host',
+                                  onPressed: () => _downloadItem(name),
+                                ),
+                                if (isDir) const Icon(Icons.chevron_right, size: 18),
+                              ],
+                            ),
+                            onTap: isDir
+                                ? () {
+                                    final nextPath = currentPath.endsWith('/')
+                                        ? '$currentPath$name'
+                                        : '$currentPath/$name';
+                                    _findContainerAndBrowse(nextPath);
+                                  }
+                                : null,
+                          );
+                        },
+                      ),
+          ),
+        ),
+      ],
     );
   }
 }

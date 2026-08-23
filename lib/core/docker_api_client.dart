@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
 import '../models/container_model.dart';
 import '../models/docker_event_model.dart';
@@ -135,35 +134,127 @@ class DockerApiClient {
     }
   }
 
-  /// Stream live container logs with 8-byte frame demuxer
+  /// Stream live container logs with HTTP chunk header stripping and 8-byte frame demuxer
   Stream<String> streamContainerLogs(String id, {int tail = 200, bool follow = true}) async* {
     final path = '/containers/$id/logs?follow=${follow ? "true" : "false"}&stdout=true&stderr=true&timestamps=true&tail=$tail';
     final stream = _socket.streamResponse(method: 'GET', path: path);
 
-    final buffer = BytesBuilder();
+    final lineBuffer = StringBuffer();
 
     await for (final chunk in stream) {
-      buffer.add(chunk);
+      final rawText = utf8.decode(chunk, allowMalformed: true);
+      lineBuffer.write(rawText);
 
-      while (buffer.length >= 8) {
-        final currentBytes = buffer.toBytes();
-        final bd = ByteData.sublistView(Uint8List.fromList(currentBytes.sublist(4, 8)));
-        final payloadLen = bd.getUint32(0, Endian.big);
+      final content = lineBuffer.toString();
+      final lines = content.split('\n');
 
-        final totalFrameLen = 8 + payloadLen;
-        if (buffer.length < totalFrameLen) {
-          break; // Frame incomplete, wait for next chunk
+      lineBuffer.clear();
+      lineBuffer.write(lines.last);
+
+      for (int i = 0; i < lines.length - 1; i++) {
+        String line = lines[i].replaceAll('\r', '').trim();
+        if (line.isEmpty) continue;
+
+        // 1. Strip HTTP chunk length hex lines (e.g., "84", "6f", "28", "42")
+        final isHexChunkHeader = RegExp(r'^[0-9a-fA-F]{1,6}$').hasMatch(line);
+        if (isHexChunkHeader) continue;
+
+        // 2. Strip 8-byte Docker stream header prefix (e.g. "\x01\x00\x00\x00...")
+        if (line.length > 8 && (line.startsWith('\x01') || line.startsWith('\x02') || line.startsWith('\x00'))) {
+          line = line.substring(8).trim();
         }
 
-        final payloadBytes = currentBytes.sublist(8, totalFrameLen);
-        final line = utf8.decode(payloadBytes, allowMalformed: true);
-        yield line;
+        // 3. Filter remaining control character junk at start of line
+        line = line.replaceAll(RegExp(r'^[\x00-\x1F\x7F-\x9F]+'), '').trim();
 
-        final remaining = currentBytes.sublist(totalFrameLen);
-        buffer.clear();
-        buffer.add(remaining);
+        if (line.isNotEmpty) {
+          yield line;
+        }
       }
     }
+  }
+
+  /// Create an exec instance inside a running container
+  Future<String> createExec(String containerId, List<String> cmd) async {
+    final body = jsonEncode({
+      'AttachStdout': true,
+      'AttachStderr': true,
+      'Tty': true,
+      'Cmd': cmd,
+    });
+    final res = await _socket.request(
+      method: 'POST',
+      path: '/containers/$containerId/exec',
+      body: body,
+      headers: {'Content-Type': 'application/json'},
+    );
+    if (!res.isSuccess) {
+      throw Exception('Failed to create exec: ${res.body}');
+    }
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    return data['Id'] as String;
+  }
+
+  /// Start an exec instance and stream output text
+  Stream<String> startExec(String execId) async* {
+    final body = jsonEncode({'Detach': false, 'Tty': true});
+    final stream = _socket.streamResponse(
+      method: 'POST',
+      path: '/exec/$execId/start',
+      body: body,
+      headers: {'Content-Type': 'application/json'},
+    );
+
+    await for (final chunk in stream) {
+      final text = utf8.decode(chunk, allowMalformed: true);
+      for (final line in text.split('\n')) {
+        final cleaned = line.replaceAll('\r', '').trim();
+        if (cleaned.isNotEmpty && !RegExp(r'^[0-9a-fA-F]{1,6}$').hasMatch(cleaned)) {
+          yield line;
+        }
+      }
+    }
+  }
+
+  /// Execute command inside container CLI using selected shell and return full output
+  Future<String> execCommand(String containerId, String command, {String shell = 'sh'}) async {
+    final execId = await createExec(containerId, [shell, '-c', command]);
+    final buffer = StringBuffer();
+    await for (final line in startExec(execId)) {
+      buffer.writeln(line);
+    }
+    return buffer.toString();
+  }
+
+  /// List files in a path inside container or mounted volume via exec
+  Future<List<Map<String, String>>> listContainerFiles(String containerId, String path) async {
+    final raw = await execCommand(containerId, 'ls -la "$path" 2>/dev/null || ls -la "$path"');
+    final lines = raw.split('\n');
+    final List<Map<String, String>> files = [];
+
+    for (final line in lines) {
+      final trimmed = line.replaceAll('\r', '').trim();
+      if (trimmed.isEmpty || trimmed.startsWith('total')) continue;
+      final parts = trimmed.split(RegExp(r'\s+'));
+      if (parts.length >= 9) {
+        final permissions = parts[0];
+        final isDir = permissions.startsWith('d');
+        final size = parts[4];
+        String fullPathName = parts.sublist(8).join(' ');
+        if (fullPathName.contains(' -> ')) {
+          fullPathName = fullPathName.split(' -> ').first;
+        }
+        final name = fullPathName.trim();
+        if (name == '.' || name == '..') continue;
+        files.add({
+          'name': name,
+          'permissions': permissions,
+          'size': size,
+          'isDir': isDir ? 'true' : 'false',
+        });
+      }
+    }
+    return files;
   }
 
   /// Stream container stats (CPU %, memory usage)
