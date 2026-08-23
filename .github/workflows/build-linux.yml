@@ -1,11 +1,9 @@
-name: Build Linux Desktop
+name: Build Linux Desktop Release
 
 on:
   push:
-    branches: [ main ]
-    tags: [ 'v*' ]
-  pull_request:
-    branches: [ main ]
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 jobs:
