@@ -120,32 +120,53 @@ Configure local Docker Unix domain socket paths (`/var/run/docker.sock`), test s
 
 ---
 
-### 📦 Quick Install from GitHub Releases (Pre-built Binaries)
+### 📦 Installation Options
 
-1. Download the latest `bulkhead-linux-x64.zip` from [GitHub Releases](https://github.com/ahmadteeb/Bulkhead/releases).
-2. Extract the package and run the application:
-   ```bash
-   # Download and extract
-   unzip bulkhead-linux-x64.zip -d ~/bulkhead
-   cd ~/bulkhead
+Choose the installation method for your Linux distribution from [GitHub Releases](https://github.com/ahmadteeb/Bulkhead/releases):
 
-   # Run Bulkhead
-   ./bulkhead
-   ```
-3. *(Optional)* Create a desktop launcher shortcut:
-   ```bash
-   mkdir -p ~/.local/share/applications
-   cat <<EOF > ~/.local/share/applications/bulkhead.desktop
-   [Desktop Entry]
-   Name=Bulkhead
-   Comment=Flutter Docker Manager for Linux
-   Exec=$HOME/bulkhead/bulkhead
-   Icon=$HOME/bulkhead/data/flutter_assets/assets/icon.png
-   Terminal=false
-   Type=Application
-   Categories=Development;System;
-   EOF
-   ```
+#### 🌀 Ubuntu / Debian / Linux Mint / Pop!_OS (`.deb`)
+Download `bulkhead_<version>_amd64.deb` and install via `apt`:
+```bash
+sudo apt update
+sudo apt install ./bulkhead_1.0.0_amd64.deb
+```
+
+#### 🎩 Fedora / RHEL / CentOS / OpenSUSE (`.rpm`)
+Download `bulkhead-<version>-1.x86_64.rpm` and install via `dnf` or `rpm`:
+```bash
+sudo dnf install ./bulkhead-1.0.0-1.x86_64.rpm
+# or
+sudo rpm -i ./bulkhead-1.0.0-1.x86_64.rpm
+```
+
+#### 🏹 Arch Linux / Manjaro / EndeavourOS (`yay` / `pacman`)
+Install directly from the Arch User Repository (AUR):
+```bash
+yay -S bulkhead-bin
+```
+
+#### 📦 Portable Linux Zip Archive (`.zip`)
+Download `bulkhead-linux-x64.zip`, extract, and run anywhere:
+```bash
+unzip bulkhead-linux-x64.zip -d ~/bulkhead
+cd ~/bulkhead
+./bulkhead
+```
+
+*(Optional Desktop Launcher for Portable ZIP)*:
+```bash
+mkdir -p ~/.local/share/applications
+cat <<EOF > ~/.local/share/applications/bulkhead.desktop
+[Desktop Entry]
+Name=Bulkhead
+Comment=Flutter Docker Manager for Linux
+Exec=$HOME/bulkhead/bulkhead
+Icon=$HOME/bulkhead/data/flutter_assets/assets/icon.png
+Terminal=false
+Type=Application
+Categories=Development;System;
+EOF
+```
 
 ---
 
@@ -178,6 +199,7 @@ flutter build linux --release
 - **State Management**: Riverpod 2.x (`StateNotifierProvider`, `StreamProvider`, `FutureProvider`).
 - **Terminal Emulator**: `xterm: ^4.0.0` with Linux PTY pseudo-terminal allocation (`script -q -c "docker exec -it ..."`).
 - **File Manager**: `file_picker` package paired with `docker cp` process execution.
+- **Packaging Pipeline**: GitHub Actions automated `.deb` (Debian/Ubuntu), `.rpm` (Fedora/RHEL), `.zip` (Portable Linux), and AUR `PKGBUILD`.
 - **Socket I/O**: Custom `DockerSocketConnection` implementing HTTP/1.1 over Unix Domain Sockets (`Socket.connect(InternetAddress('/var/run/docker.sock', InternetAddressType.unix), 0)`).
 - **Stream Demuxing**: 8-byte multiplexing header demuxer parsing `stdout` (stream type `1`) and `stderr` (stream type `2`) from Docker container log streams.
 - **Typography**: Google Fonts (`Hanken Grotesk` headings, `JetBrains Mono` telemetry).

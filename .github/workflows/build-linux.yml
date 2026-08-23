@@ -20,7 +20,7 @@ jobs:
       - name: Install Linux build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libglib2.0-dev
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libglib2.0-dev rpm
 
       - name: Setup Flutter SDK
         uses: subosito/flutter-action@v2
@@ -43,22 +43,100 @@ jobs:
       - name: Build Linux Desktop Release
         run: flutter build linux --release
 
-      - name: Package Linux Desktop Bundle
+      - name: Package Linux Desktop Bundles (.zip, .deb, .rpm)
         run: |
           mkdir -p release
+          RAW_TAG="${GITHUB_REF#refs/tags/v}"
+          VERSION="${RAW_TAG:-1.0.0}"
+          echo "Packaging version: $VERSION"
+
+          # 1. Package ZIP Archive
           cd build/linux/x64/release/bundle
           zip -r ../../../../../release/bulkhead-linux-x64.zip .
+          cd ../../../../../
 
-      - name: Upload Build Artifact
+          # 2. Package Debian/Ubuntu .deb
+          DEB_DIR="deb_dist/bulkhead_${VERSION}_amd64"
+          mkdir -p "$DEB_DIR/DEBIAN" "$DEB_DIR/opt/bulkhead" "$DEB_DIR/usr/bin" "$DEB_DIR/usr/share/applications"
+          cat <<EOF > "$DEB_DIR/DEBIAN/control"
+          Package: bulkhead
+          Version: ${VERSION}
+          Architecture: amd64
+          Maintainer: Ahmad Teeb <ahmadteeb>
+          Depends: libgtk-3-0, docker.io | docker
+          Section: utils
+          Priority: optional
+          Description: State-of-the-art Flutter Docker Engine Manager for Linux
+           Bulkhead is a state-of-the-art desktop Linux Docker Engine manager built with Flutter Desktop.
+          EOF
+
+          cp -r build/linux/x64/release/bundle/* "$DEB_DIR/opt/bulkhead/"
+          chmod +x "$DEB_DIR/opt/bulkhead/bulkhead"
+          ln -s /opt/bulkhead/bulkhead "$DEB_DIR/usr/bin/bulkhead"
+
+          cat <<EOF > "$DEB_DIR/usr/share/applications/bulkhead.desktop"
+          [Desktop Entry]
+          Name=Bulkhead
+          Comment=Flutter Docker Manager for Linux
+          Exec=/usr/bin/bulkhead
+          Icon=/opt/bulkhead/data/flutter_assets/assets/icon.png
+          Terminal=false
+          Type=Application
+          Categories=Development;System;
+          EOF
+
+          dpkg-deb --build "$DEB_DIR" "release/bulkhead_${VERSION}_amd64.deb"
+
+          # 3. Package RedHat/Fedora .rpm
+          RPM_ROOT="rpm_dist/BUILDROOT/bulkhead-${VERSION}-1.x86_64"
+          mkdir -p "rpm_dist/BUILD" "rpm_dist/RPMS" "rpm_dist/SOURCES" "rpm_dist/SPECS" "$RPM_ROOT/opt/bulkhead" "$RPM_ROOT/usr/bin" "$RPM_ROOT/usr/share/applications"
+
+          cp -r build/linux/x64/release/bundle/* "$RPM_ROOT/opt/bulkhead/"
+          chmod +x "$RPM_ROOT/opt/bulkhead/bulkhead"
+          ln -s /opt/bulkhead/bulkhead "$RPM_ROOT/usr/bin/bulkhead"
+
+          cat <<EOF > "$RPM_ROOT/usr/share/applications/bulkhead.desktop"
+          [Desktop Entry]
+          Name=Bulkhead
+          Comment=Flutter Docker Manager for Linux
+          Exec=/usr/bin/bulkhead
+          Icon=/opt/bulkhead/data/flutter_assets/assets/icon.png
+          Terminal=false
+          Type=Application
+          Categories=Development;System;
+          EOF
+
+          cat <<EOF > "rpm_dist/SPECS/bulkhead.spec"
+          Name:           bulkhead
+          Version:        ${VERSION}
+          Release:        1
+          Summary:        State-of-the-art Flutter Docker Engine Manager for Linux
+          License:        MIT
+          URL:            https://github.com/ahmadteeb/Bulkhead
+
+          %description
+          State-of-the-art Flutter Docker Engine Manager for Linux
+
+          %files
+          /opt/bulkhead
+          /usr/bin/bulkhead
+          /usr/share/applications/bulkhead.desktop
+
+          EOF
+
+          rpmbuild --define "_topdir $(pwd)/rpm_dist" -bb rpm_dist/SPECS/bulkhead.spec
+          cp rpm_dist/RPMS/x86_64/*.rpm release/
+
+      - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: bulkhead-linux-x64
-          path: release/bulkhead-linux-x64.zip
+          name: bulkhead-linux-packages
+          path: release/*
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: release/bulkhead-linux-x64.zip
+          files: release/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
