@@ -96,7 +96,7 @@ class DataTableShell extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                 ],
-                if (actions != null) ...actions!,
+                ...?actions,
               ],
             ),
           ),
