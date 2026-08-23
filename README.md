@@ -26,56 +26,56 @@
 ### 📊 1. Dashboard Overview
 Inspect real-time system metrics, active container slots, `docker system df` storage usage bars, 1-click **Prune System**, and live Docker Engine `/events` stream telemetry.
 
-![Dashboard Overview](design/dashboard/screen.png)
+![Dashboard Overview](screenshots/dashboard.png)
 
 ---
 
 ### 📦 2. Containers Management
 Monitor and filter container instances (All, Running, Stopped). Perform multi-selection bulk operations or click **Run Container** to deploy new containers with custom port bindings and environment variables.
 
-![Containers Management](design/containers_list/screen.png)
+![Containers Management](screenshots/containers.png)
 
 ---
 
 ### 🔍 3. Container Details & Real-Time Logs Stream
 Deep dive into container telemetry with demuxed stdout/stderr log streaming, raw Docker inspect JSON payload view, environment variables, port mappings, and host volume mounts.
 
-![Container Detail & Telemetry](design/container_detail/screen.png)
+![Container Detail & Telemetry](screenshots/container_detail.png)
 
 ---
 
 ### 🚀 4. Docker Compose Stacks
 Deploy and manage multi-container Compose applications. View service health, stream service terminal logs, edit `docker-compose.yml` directly, and perform full stack lifecycle controls (**Up**, **Down**, **Restart**, **Purge/Delete**).
 
-![Compose Stacks Management](design/compose_stacks/screen.png)
+![Compose Stacks Management](screenshots/compose.png)
 
 ---
 
 ### 🖼️ 5. Local Image Registry
 Inspect locally stored Docker images, view repository tags and sizes, execute **Run Container from Image**, perform bulk image deletion, and use the real-time layer progress terminal in **Pull Image**.
 
-![Image Registry](design/images/screen.png)
+![Image Registry](screenshots/images.png)
 
 ---
 
 ### 💾 6. Volume Storage Points
 Manage persistent storage volumes, inspect host mountpoints and drivers, create new volumes, prune unused volume points, and perform multi-selection deletion.
 
-![Volume Storage Points](design/volumes/screen.png)
+![Volume Storage Points](screenshots/volumes.png)
 
 ---
 
 ### 🌐 7. Virtual Networks Topology
 Visualize virtual bridge, host, overlay, and macvlan networks. Inspect subnets, gateways, attached container IDs, and create custom networks.
 
-![Virtual Networks Topology](design/networks/screen.png)
+![Virtual Networks Topology](screenshots/networks.png)
 
 ---
 
 ### ⚙️ 8. System Settings & Connection Configuration
 Configure local Docker Unix domain socket paths (`/var/run/docker.sock`), test socket permissions, and switch theme modes (**Dark**, **Light**, **System Default**).
 
-![Settings Screen](design/settings/screen.png)
+![Settings Screen](screenshots/settings.png)
 
 ---
 

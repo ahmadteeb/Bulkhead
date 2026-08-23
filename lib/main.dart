@@ -30,7 +30,7 @@ class BulkheadApp extends ConsumerWidget {
     final themeMode = ref.watch(appThemeModeProvider);
 
     return MaterialApp(
-      title: 'Bulkhead - Flutter Docker Manager',
+      title: 'Bulkhead',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
