@@ -139,8 +139,12 @@ sudo dnf install ./bulkhead-1.0.0-1.x86_64.rpm
 sudo rpm -i ./bulkhead-1.0.0-1.x86_64.rpm
 ```
 
-#### 🏹 Arch Linux / Manjaro / EndeavourOS (`yay` / `pacman`)
-Install directly from the Arch User Repository (AUR):
+#### 🏹 Arch Linux / Manjaro / EndeavourOS (`.pkg.tar.zst` or `yay`)
+Download `bulkhead-<version>-1-x86_64.pkg.tar.zst` and install via `pacman`:
+```bash
+sudo pacman -U ./bulkhead-1.0.0-1-x86_64.pkg.tar.zst
+```
+Or install directly from AUR:
 ```bash
 yay -S bulkhead-bin
 ```
@@ -199,7 +203,7 @@ flutter build linux --release
 - **State Management**: Riverpod 2.x (`StateNotifierProvider`, `StreamProvider`, `FutureProvider`).
 - **Terminal Emulator**: `xterm: ^4.0.0` with Linux PTY pseudo-terminal allocation (`script -q -c "docker exec -it ..."`).
 - **File Manager**: `file_picker` package paired with `docker cp` process execution.
-- **Packaging Pipeline**: GitHub Actions automated `.deb` (Debian/Ubuntu), `.rpm` (Fedora/RHEL), `.zip` (Portable Linux), and AUR `PKGBUILD`.
+- **Packaging Pipeline**: GitHub Actions automated `.deb` (Debian/Ubuntu), `.rpm` (Fedora/RHEL), `.pkg.tar.zst` (Arch Linux), `.zip` (Portable Linux), and AUR `PKGBUILD`.
 - **Socket I/O**: Custom `DockerSocketConnection` implementing HTTP/1.1 over Unix Domain Sockets (`Socket.connect(InternetAddress('/var/run/docker.sock', InternetAddressType.unix), 0)`).
 - **Stream Demuxing**: 8-byte multiplexing header demuxer parsing `stdout` (stream type `1`) and `stderr` (stream type `2`) from Docker container log streams.
 - **Typography**: Google Fonts (`Hanken Grotesk` headings, `JetBrains Mono` telemetry).

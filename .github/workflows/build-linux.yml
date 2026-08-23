@@ -20,7 +20,7 @@ jobs:
       - name: Install Linux build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libglib2.0-dev rpm
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libglib2.0-dev rpm zstd
 
       - name: Setup Flutter SDK
         uses: subosito/flutter-action@v2
@@ -43,7 +43,7 @@ jobs:
       - name: Build Linux Desktop Release
         run: flutter build linux --release
 
-      - name: Package Linux Desktop Bundles (.zip, .deb, .rpm)
+      - name: Package Linux Desktop Bundles (.zip, .deb, .rpm, .pkg.tar.zst)
         run: |
           mkdir -p release
           RAW_TAG="${GITHUB_REF#refs/tags/v}"
@@ -126,6 +126,42 @@ jobs:
 
           rpmbuild --define "_topdir $(pwd)/rpm_dist" -bb rpm_dist/SPECS/bulkhead.spec
           cp rpm_dist/RPMS/x86_64/*.rpm release/
+
+          # 4. Package Arch Linux .pkg.tar.zst
+          ARCH_DIR="arch_dist"
+          mkdir -p "$ARCH_DIR/opt/bulkhead" "$ARCH_DIR/usr/bin" "$ARCH_DIR/usr/share/applications"
+          cp -r build/linux/x64/release/bundle/* "$ARCH_DIR/opt/bulkhead/"
+          chmod +x "$ARCH_DIR/opt/bulkhead/bulkhead"
+          ln -s /opt/bulkhead/bulkhead "$ARCH_DIR/usr/bin/bulkhead"
+
+          cat <<EOF > "$ARCH_DIR/usr/share/applications/bulkhead.desktop"
+          [Desktop Entry]
+          Name=Bulkhead
+          Comment=Flutter Docker Manager for Linux
+          Exec=/usr/bin/bulkhead
+          Icon=/opt/bulkhead/data/flutter_assets/assets/icon.png
+          Terminal=false
+          Type=Application
+          Categories=Development;System;
+          EOF
+
+          BUILD_DATE=$(date +%s)
+          cat <<EOF > "$ARCH_DIR/.PKGINFO"
+          pkgname = bulkhead
+          pkgver = ${VERSION}-1
+          pkgdesc = State-of-the-art Flutter Docker Engine Manager for Linux
+          url = https://github.com/ahmadteeb/Bulkhead
+          builddate = ${BUILD_DATE}
+          packager = Ahmad Teeb <ahmadteeb>
+          arch = x86_64
+          license = MIT
+          depend = gtk3
+          depend = docker
+          EOF
+
+          cd "$ARCH_DIR"
+          tar -c --zstd -f "../release/bulkhead-${VERSION}-1-x86_64.pkg.tar.zst" .PKGINFO opt usr
+          cd ..
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
