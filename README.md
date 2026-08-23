@@ -9,7 +9,7 @@
   <a href="https://archlinux.org"><img src="https://img.shields.io/badge/Platform-Linux%20Desktop-FCC624?logo=linux" alt="Platform" /></a>
   <a href="https://www.docker.com"><img src="https://img.shields.io/badge/Docker-Native%20Unix%20Socket-2496ED?logo=docker" alt="Docker" /></a>
   <a href="https://riverpod.dev"><img src="https://img.shields.io/badge/Riverpod-2.x-3C873A" alt="Riverpod" /></a>
-  <a href="#-100-real-time-event-driven-architecture"><img src="https://img.shields.io/badge/Architecture-100%25%20Real--Time%20Event--Driven-FF6F00" alt="Architecture" /></a>
+  <a href="https://github.com/ahmadteeb/Bulkhead/releases"><img src="https://img.shields.io/github/v/release/ahmadteeb/Bulkhead?color=FF6F00&logo=github" alt="GitHub Release" /></a>
 </p>
 
 **Bulkhead** is a state-of-the-art desktop Linux Docker Engine manager built with **Flutter Desktop**. It provides high-performance, real-time container administration, multi-container Compose stack management, local image registry inspection, persistent volume control, virtual network topology visualization, embedded interactive terminal emulation, container volume file browsing with upload/download capabilities, and single-click system storage optimization.
@@ -117,7 +117,35 @@ Configure local Docker Unix domain socket paths (`/var/run/docker.sock`), test s
   sudo usermod -aG docker $USER
   newgrp docker
   ```
-- **Flutter SDK**: 3.10+ (for building from source).
+
+---
+
+### 📦 Quick Install from GitHub Releases (Pre-built Binaries)
+
+1. Download the latest `bulkhead-linux-x64.zip` from [GitHub Releases](https://github.com/ahmadteeb/Bulkhead/releases).
+2. Extract the package and run the application:
+   ```bash
+   # Download and extract
+   unzip bulkhead-linux-x64.zip -d ~/bulkhead
+   cd ~/bulkhead
+
+   # Run Bulkhead
+   ./bulkhead
+   ```
+3. *(Optional)* Create a desktop launcher shortcut:
+   ```bash
+   mkdir -p ~/.local/share/applications
+   cat <<EOF > ~/.local/share/applications/bulkhead.desktop
+   [Desktop Entry]
+   Name=Bulkhead
+   Comment=Flutter Docker Manager for Linux
+   Exec=$HOME/bulkhead/bulkhead
+   Icon=$HOME/bulkhead/data/flutter_assets/assets/icon.png
+   Terminal=false
+   Type=Application
+   Categories=Development;System;
+   EOF
+   ```
 
 ---
 
