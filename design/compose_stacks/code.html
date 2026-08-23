@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Dockyard - Compose Stacks</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700;800;900&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-secondary": "#163440",
+                      "tertiary-fixed": "#ebdcff",
+                      "outline": "#87929a",
+                      "surface-tint": "#70d2ff",
+                      "tertiary-container": "#bc97ff",
+                      "on-primary-container": "#00445b",
+                      "surface-container-highest": "#333538",
+                      "inverse-on-surface": "#2f3034",
+                      "secondary-container": "#304d5a",
+                      "on-tertiary-fixed-variant": "#572e99",
+                      "tertiary-fixed-dim": "#d4bbff",
+                      "on-tertiary": "#3f0f81",
+                      "on-secondary-fixed": "#001f2a",
+                      "on-background": "#e2e2e6",
+                      "on-secondary-container": "#9fbdcc",
+                      "background": "#111316",
+                      "error-container": "#93000a",
+                      "on-secondary-fixed-variant": "#2e4b57",
+                      "on-surface": "#e2e2e6",
+                      "primary-container": "#0db7ed",
+                      "error": "#ffb4ab",
+                      "on-primary": "#003547",
+                      "outline-variant": "#3d484f",
+                      "surface-container-high": "#282a2d",
+                      "surface-container-low": "#1a1c1f",
+                      "on-tertiary-container": "#4e2490",
+                      "on-error": "#690005",
+                      "secondary-fixed": "#c9e7f7",
+                      "surface-dim": "#111316",
+                      "inverse-surface": "#e2e2e6",
+                      "primary-fixed-dim": "#70d2ff",
+                      "on-surface-variant": "#bcc8d0",
+                      "inverse-primary": "#006686",
+                      "on-primary-fixed": "#001e2b",
+                      "tertiary": "#d4bbff",
+                      "secondary-fixed-dim": "#adcbda",
+                      "surface-container-lowest": "#0c0e11",
+                      "surface-variant": "#333538",
+                      "on-error-container": "#ffdad6",
+                      "primary": "#70d2ff",
+                      "surface-container": "#1e2023",
+                      "primary-fixed": "#c0e8ff",
+                      "secondary": "#adcbda",
+                      "on-primary-fixed-variant": "#004d66",
+                      "surface": "#111316",
+                      "on-tertiary-fixed": "#260058",
+                      "surface-bright": "#37393d"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "container-padding": "24px",
+                      "unit": "4px",
+                      "sidebar-width": "260px",
+                      "density-compact": "8px",
+                      "sidebar-collapsed": "64px",
+                      "density-comfortable": "12px",
+                      "gutter": "16px"
+              },
+              "fontFamily": {
+                      "body-sm": [
+                              "Hanken Grotesk"
+                      ],
+                      "code-sm": [
+                              "JetBrains Mono"
+                      ],
+                      "label-caps": [
+                              "Hanken Grotesk"
+                      ],
+                      "headline-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "title-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "code-md": [
+                              "JetBrains Mono"
+                      ],
+                      "headline-lg": [
+                              "Hanken Grotesk"
+                      ],
+                      "body-md": [
+                              "Hanken Grotesk"
+                      ]
+              },
+              "fontSize": {
+                      "body-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "code-sm": [
+                              "11px",
+                              {
+                                      "lineHeight": "14px",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "label-caps": [
+                              "11px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "title-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "code-md": [
+                              "13px",
+                              {
+                                      "lineHeight": "18px",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+<style>
+        /* Syntax Highlighting for YAML preview */
+        .hljs-attr { color: #70d2ff; } /* primary */
+        .hljs-string { color: #c9e7f7; } /* secondary-fixed */
+        .hljs-number { color: #bc97ff; } /* tertiary-container */
+        .hljs-meta { color: #87929a; } /* outline */
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md h-screen flex overflow-hidden selection:bg-primary-container selection:text-on-primary-container">
+<!-- SideNavBar -->
+<aside class="bg-background dark:bg-background border-r border-outline-variant dark:border-outline-variant w-sidebar-width h-screen sticky left-0 top-0 flex flex-col h-full py-density-comfortable shrink-0 hidden md:flex">
+<div class="px-gutter mb-6 flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-3xl font-bold" data-icon="anchor" data-weight="fill" style="font-variation-settings: 'FILL' 1;">anchor</span>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary leading-tight">Dockyard</h1>
+<p class="font-code-sm text-code-sm text-on-surface-variant">Engine 24.0.7</p>
+</div>
+</div>
+<nav class="flex-1 overflow-y-auto">
+<ul class="space-y-1 px-2">
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-body-md text-body-md">Dashboard</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="view_in_ar">view_in_ar</span>
+<span class="font-body-md text-body-md">Containers</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="layers">layers</span>
+<span class="font-body-md text-body-md">Images</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="storage">storage</span>
+<span class="font-body-md text-body-md">Volumes</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="lan">lan</span>
+<span class="font-body-md text-body-md">Networks</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-r bg-primary/10 text-primary border-l-2 border-primary font-bold opacity-90 transition-all hover:bg-surface-container-high" href="#">
+<span class="material-symbols-outlined" data-icon="account_tree">account_tree</span>
+<span class="font-body-md text-body-md">Compose Stacks</span>
+</a>
+</li>
+</ul>
+</nav>
+<div class="mt-auto pt-4 border-t border-outline-variant px-2">
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-body-md text-body-md">Settings</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+<!-- TopAppBar -->
+<header class="bg-surface-container-low dark:bg-surface-container-low border-b border-outline-variant dark:border-outline-variant w-full sticky top-0 z-30 flex justify-between items-center px-gutter py-density-compact h-16 shrink-0">
+<div class="flex items-center gap-4">
+<button class="md:hidden text-on-surface-variant hover:text-primary">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<h2 class="font-headline-md text-headline-md font-black text-on-surface dark:text-on-surface hidden md:block">Compose Stacks</h2>
+</div>
+<div class="flex items-center gap-4 flex-1 justify-end">
+<!-- Search Bar -->
+<div class="relative w-64 hidden lg:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm" data-icon="search">search</span>
+<input class="w-full bg-surface-container-highest border border-outline-variant rounded pl-9 pr-3 py-1.5 font-body-sm text-body-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors placeholder:text-on-surface-variant" placeholder="Search stacks..." type="text"/>
+</div>
+<!-- Actions -->
+<button class="font-label-caps text-label-caps bg-primary text-on-primary px-4 py-2 rounded hover:bg-primary-fixed transition-colors font-bold tracking-wider">
+                    Deploy Container
+                </button>
+<button class="font-label-caps text-label-caps border border-outline-variant text-primary px-4 py-2 rounded hover:bg-surface-container-highest transition-colors font-bold tracking-wider">
+                    Prune System
+                </button>
+<div class="flex items-center gap-2 border-l border-outline-variant pl-4 ml-2">
+<button class="text-on-surface-variant hover:text-primary transition-colors p-1 rounded hover:bg-surface-container-highest">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors p-1 rounded hover:bg-surface-container-highest">
+<span class="material-symbols-outlined" data-icon="help_outline">help_outline</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Canvas -->
+<div class="flex-1 overflow-y-auto p-container-padding pb-16">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
+<!-- Stacks List (Left Col) -->
+<div class="lg:col-span-4 flex flex-col gap-4">
+<div class="flex justify-between items-center mb-2">
+<h3 class="font-title-md text-title-md text-on-surface">Active Stacks</h3>
+<span class="bg-surface-container-highest text-on-surface-variant px-2 py-0.5 rounded font-code-sm text-code-sm">3 Total</span>
+</div>
+<!-- Stack Card: Active -->
+<button class="text-left bg-surface-container-low border border-primary rounded p-4 shadow-[0_0_15px_rgba(112,210,255,0.1)] transition-all flex flex-col gap-3 group relative overflow-hidden">
+<div class="absolute top-0 left-0 w-1 h-full bg-primary"></div>
+<div class="flex justify-between items-start w-full">
+<div>
+<h4 class="font-title-md text-title-md text-primary font-bold group-hover:text-primary-fixed transition-colors">ecommerce-app</h4>
+<p class="font-code-sm text-code-sm text-on-surface-variant mt-1">/opt/stacks/ecommerce</p>
+</div>
+<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded border border-[#70d2ff]/30 bg-[#70d2ff]/10 text-primary font-label-caps text-label-caps">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                                Running
+                            </span>
+</div>
+<div class="flex items-center gap-4 text-on-surface-variant mt-2 border-t border-outline-variant/50 pt-3 w-full">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-sm" data-icon="view_in_ar">view_in_ar</span>
+<span class="font-code-sm text-code-sm">5 Services</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-sm" data-icon="history">history</span>
+<span class="font-code-sm text-code-sm">Up 2 days</span>
+</div>
+</div>
+</button>
+<!-- Stack Card: Stopped -->
+<button class="text-left bg-surface border border-outline-variant/50 rounded p-4 hover:border-outline-variant hover:bg-surface-container-low transition-all flex flex-col gap-3 group">
+<div class="flex justify-between items-start w-full">
+<div>
+<h4 class="font-title-md text-title-md text-on-surface group-hover:text-primary transition-colors">monitoring-stack</h4>
+<p class="font-code-sm text-code-sm text-on-surface-variant mt-1">/opt/stacks/monitoring</p>
+</div>
+<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded border border-outline/30 bg-surface-variant text-on-surface-variant font-label-caps text-label-caps">
+<span class="w-1.5 h-1.5 rounded-full bg-outline"></span>
+                                Stopped
+                            </span>
+</div>
+<div class="flex items-center gap-4 text-on-surface-variant mt-2 border-t border-outline-variant/50 pt-3 w-full">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-sm" data-icon="view_in_ar">view_in_ar</span>
+<span class="font-code-sm text-code-sm">3 Services</span>
+</div>
+</div>
+</button>
+<!-- Stack Card: Error -->
+<button class="text-left bg-surface border border-outline-variant/50 rounded p-4 hover:border-outline-variant hover:bg-surface-container-low transition-all flex flex-col gap-3 group">
+<div class="flex justify-between items-start w-full">
+<div>
+<h4 class="font-title-md text-title-md text-on-surface group-hover:text-primary transition-colors">legacy-api</h4>
+<p class="font-code-sm text-code-sm text-on-surface-variant mt-1">/opt/stacks/api</p>
+</div>
+<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded border border-error/30 bg-error/10 text-error font-label-caps text-label-caps">
+<span class="w-1.5 h-1.5 rounded-full bg-error"></span>
+                                Exited (1)
+                            </span>
+</div>
+<div class="flex items-center gap-4 text-on-surface-variant mt-2 border-t border-outline-variant/50 pt-3 w-full">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-sm" data-icon="view_in_ar">view_in_ar</span>
+<span class="font-code-sm text-code-sm">2 Services</span>
+</div>
+</div>
+</button>
+<button class="border border-dashed border-outline-variant rounded p-4 flex flex-col items-center justify-center text-on-surface-variant hover:text-primary hover:border-primary hover:bg-primary/5 transition-all mt-2 h-24 gap-2">
+<span class="material-symbols-outlined" data-icon="add_circle">add_circle</span>
+<span class="font-title-md text-title-md">Create New Stack</span>
+</button>
+</div>
+<!-- Detail Panel (Right Col) -->
+<div class="lg:col-span-8 flex flex-col gap-6 h-full">
+<!-- Detail Header & Actions -->
+<div class="bg-surface-container-low border border-outline-variant rounded p-6 flex justify-between items-center relative overflow-hidden">
+<!-- subtle background accent -->
+<div class="absolute right-0 top-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none"></div>
+<div>
+<div class="flex items-center gap-3 mb-1">
+<h2 class="font-headline-lg text-headline-lg text-on-surface">ecommerce-app</h2>
+<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded border border-[#70d2ff]/30 bg-[#70d2ff]/10 text-primary font-label-caps text-label-caps h-fit">
+                                    Running
+                                </span>
+</div>
+<p class="font-code-sm text-code-sm text-on-surface-variant flex items-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="folder">folder</span>
+                                /opt/stacks/ecommerce/docker-compose.yml
+                            </p>
+</div>
+<div class="flex gap-3 relative z-10">
+<button class="flex items-center gap-2 px-4 py-2 border border-outline-variant rounded bg-surface hover:bg-surface-container-highest transition-colors font-label-caps text-label-caps text-on-surface" title="Stop Stack">
+<span class="material-symbols-outlined text-sm" data-icon="stop">stop</span> Down
+                            </button>
+<button class="flex items-center gap-2 px-4 py-2 border border-outline-variant rounded bg-surface hover:bg-surface-container-highest transition-colors font-label-caps text-label-caps text-on-surface" title="Restart Stack">
+<span class="material-symbols-outlined text-sm" data-icon="restart_alt">restart_alt</span> Restart
+                            </button>
+<button class="flex items-center gap-2 px-4 py-2 border border-error/50 rounded bg-error/10 hover:bg-error/20 transition-colors font-label-caps text-label-caps text-error" title="Delete Stack">
+<span class="material-symbols-outlined text-sm" data-icon="delete">delete</span> Delete
+                            </button>
+</div>
+</div>
+<!-- Services Table -->
+<div class="bg-surface border border-outline-variant rounded flex flex-col overflow-hidden flex-shrink-0">
+<div class="px-4 py-3 border-b border-outline-variant bg-surface-container-lowest flex justify-between items-center">
+<h3 class="font-title-md text-title-md text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-sm text-on-surface-variant" data-icon="list">list</span>
+                                Services
+                            </h3>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead class="bg-surface-container-lowest">
+<tr>
+<th class="font-label-caps text-label-caps text-on-surface-variant px-4 py-3 border-b border-outline-variant font-bold">Service Name</th>
+<th class="font-label-caps text-label-caps text-on-surface-variant px-4 py-3 border-b border-outline-variant font-bold">Image</th>
+<th class="font-label-caps text-label-caps text-on-surface-variant px-4 py-3 border-b border-outline-variant font-bold">State</th>
+<th class="font-label-caps text-label-caps text-on-surface-variant px-4 py-3 border-b border-outline-variant font-bold">Ports</th>
+<th class="font-label-caps text-label-caps text-on-surface-variant px-4 py-3 border-b border-outline-variant font-bold text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="font-body-md text-body-md">
+<tr class="hover:bg-surface-container-high transition-colors border-b border-outline-variant/50 group">
+<td class="px-4 py-2 font-code-md text-code-md text-on-surface">web-frontend</td>
+<td class="px-4 py-2 font-code-sm text-code-sm text-on-surface-variant">nginx:alpine</td>
+<td class="px-4 py-2">
+<span class="inline-flex items-center gap-1 text-[#70d2ff]">
+<span class="w-1.5 h-1.5 rounded-full bg-[#70d2ff]"></span>
+                                                Running
+                                            </span>
+</td>
+<td class="px-4 py-2 font-code-sm text-code-sm text-on-surface-variant">80:80, 443:443</td>
+<td class="px-4 py-2 text-right">
+<button class="text-on-surface-variant hover:text-primary transition-colors p-1 opacity-0 group-hover:opacity-100"><span class="material-symbols-outlined text-sm" data-icon="terminal">terminal</span></button>
+<button class="text-on-surface-variant hover:text-primary transition-colors p-1 opacity-0 group-hover:opacity-100"><span class="material-symbols-outlined text-sm" data-icon="description">description</span></button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-high transition-colors border-b border-outline-variant/50 group">
+<td class="px-4 py-2 font-code-md text-code-md text-on-surface">api-server</td>
+<td class="px-4 py-2 font-code-sm text-code-sm text-on-surface-variant">node:18-alpine</td>
+<td class="px-4 py-2">
+<span class="inline-flex items-center gap-1 text-[#70d2ff]">
+<span class="w-1.5 h-1.5 rounded-full bg-[#70d2ff]"></span>
+                                                Running
+                                            </span>
+</td>
+<td class="px-4 py-2 font-code-sm text-code-sm text-on-surface-variant">3000:3000</td>
+<td class="px-4 py-2 text-right">
+<button class="text-on-surface-variant hover:text-primary transition-colors p-1 opacity-0 group-hover:opacity-100"><span class="material-symbols-outlined text-sm" data-icon="terminal">terminal</span></button>
+<button class="text-on-surface-variant hover:text-primary transition-colors p-1 opacity-0 group-hover:opacity-100"><span class="material-symbols-outlined text-sm" data-icon="description">description</span></button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-high transition-colors border-b border-outline-variant/50 group">
+<td class="px-4 py-2 font-code-md text-code-md text-on-surface">database</td>
+<td class="px-4 py-2 font-code-sm text-code-sm text-on-surface-variant">postgres:15</td>
+<td class="px-4 py-2">
+<span class="inline-flex items-center gap-1 text-[#70d2ff]">
+<span class="w-1.5 h-1.5 rounded-full bg-[#70d2ff]"></span>
+                                                Running
+                                            </span>
+</td>
+<td class="px-4 py-2 font-code-sm text-code-sm text-on-surface-variant">5432:5432</td>
+<td class="px-4 py-2 text-right">
+<button class="text-on-surface-variant hover:text-primary transition-colors p-1 opacity-0 group-hover:opacity-100"><span class="material-symbols-outlined text-sm" data-icon="terminal">terminal</span></button>
+<button class="text-on-surface-variant hover:text-primary transition-colors p-1 opacity-0 group-hover:opacity-100"><span class="material-symbols-outlined text-sm" data-icon="description">description</span></button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-high transition-colors border-b border-outline-variant/50 group">
+<td class="px-4 py-2 font-code-md text-code-md text-on-surface">redis-cache</td>
+<td class="px-4 py-2 font-code-sm text-code-sm text-on-surface-variant">redis:7-alpine</td>
+<td class="px-4 py-2">
+<span class="inline-flex items-center gap-1 text-[#70d2ff]">
+<span class="w-1.5 h-1.5 rounded-full bg-[#70d2ff]"></span>
+                                                Running
+                                            </span>
+</td>
+<td class="px-4 py-2 font-code-sm text-code-sm text-on-surface-variant">6379</td>
+<td class="px-4 py-2 text-right">
+<button class="text-on-surface-variant hover:text-primary transition-colors p-1 opacity-0 group-hover:opacity-100"><span class="material-symbols-outlined text-sm" data-icon="terminal">terminal</span></button>
+<button class="text-on-surface-variant hover:text-primary transition-colors p-1 opacity-0 group-hover:opacity-100"><span class="material-symbols-outlined text-sm" data-icon="description">description</span></button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-high transition-colors group">
+<td class="px-4 py-2 font-code-md text-code-md text-on-surface">worker</td>
+<td class="px-4 py-2 font-code-sm text-code-sm text-on-surface-variant">node:18-alpine</td>
+<td class="px-4 py-2">
+<span class="inline-flex items-center gap-1 text-[#70d2ff]">
+<span class="w-1.5 h-1.5 rounded-full bg-[#70d2ff]"></span>
+                                                Running
+                                            </span>
+</td>
+<td class="px-4 py-2 font-code-sm text-code-sm text-on-surface-variant">-</td>
+<td class="px-4 py-2 text-right">
+<button class="text-on-surface-variant hover:text-primary transition-colors p-1 opacity-0 group-hover:opacity-100"><span class="material-symbols-outlined text-sm" data-icon="terminal">terminal</span></button>
+<button class="text-on-surface-variant hover:text-primary transition-colors p-1 opacity-0 group-hover:opacity-100"><span class="material-symbols-outlined text-sm" data-icon="description">description</span></button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Compose File Editor Preview -->
+<div class="bg-[#1e1e1e] border border-outline-variant rounded flex flex-col flex-1 min-h-[300px] overflow-hidden shadow-inner">
+<div class="px-4 py-2 border-b border-outline-variant bg-[#252526] flex justify-between items-center">
+<span class="font-code-sm text-code-sm text-on-surface-variant flex items-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="code">code</span>
+                                docker-compose.yml
+                            </span>
+<button class="text-on-surface-variant hover:text-primary text-xs font-label-caps flex items-center gap-1">
+<span class="material-symbols-outlined text-sm" data-icon="edit">edit</span> EDIT
+                            </button>
+</div>
+<div class="p-4 overflow-auto font-code-md text-code-md text-[#d4d4d4] leading-relaxed whitespace-pre font-mono">
+<span class="hljs-attr">version:</span> <span class="hljs-string">'3.8'</span>
+<span class="hljs-attr">services:</span>
+<span class="hljs-attr">web-frontend:</span>
+<span class="hljs-attr">image:</span> <span class="hljs-string">nginx:alpine</span>
+<span class="hljs-attr">ports:</span>
+      - <span class="hljs-string">"80:80"</span>
+      - <span class="hljs-string">"443:443"</span>
+<span class="hljs-attr">depends_on:</span>
+      - <span class="hljs-string">api-server</span>
+<span class="hljs-attr">networks:</span>
+      - <span class="hljs-string">app-network</span>
+<span class="hljs-attr">api-server:</span>
+<span class="hljs-attr">image:</span> <span class="hljs-string">node:18-alpine</span>
+<span class="hljs-attr">environment:</span>
+<span class="hljs-attr">NODE_ENV:</span> <span class="hljs-string">production</span>
+<span class="hljs-attr">DB_HOST:</span> <span class="hljs-string">database</span>
+<span class="hljs-attr">ports:</span>
+      - <span class="hljs-string">"3000:3000"</span>
+<span class="hljs-attr">networks:</span>
+      - <span class="hljs-string">app-network</span>
+<span class="hljs-attr">database:</span>
+<span class="hljs-attr">image:</span> <span class="hljs-string">postgres:15</span>
+<span class="hljs-attr">environment:</span>
+<span class="hljs-attr">POSTGRES_USER:</span> <span class="hljs-string">admin</span>
+<span class="hljs-attr">POSTGRES_PASSWORD:</span> <span class="hljs-string">${DB_PASSWORD}</span>
+<span class="hljs-attr">volumes:</span>
+      - <span class="hljs-string">db-data:/var/lib/postgresql/data</span>
+<span class="hljs-attr">networks:</span>
+      - <span class="hljs-string">app-network</span>
+<span class="hljs-attr">volumes:</span>
+<span class="hljs-attr">db-data:</span>
+<span class="hljs-attr">networks:</span>
+<span class="hljs-attr">app-network:</span>
+<span class="hljs-attr">driver:</span> <span class="hljs-string">bridge</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer -->
+<footer class="bg-surface-container-lowest dark:bg-surface-container-lowest border-t border-outline-variant dark:border-outline-variant fixed bottom-0 w-full h-8 z-40 flex justify-between items-center px-gutter w-full ml-0 md:ml-[260px] md:w-[calc(100%-260px)]">
+<span class="font-code-sm text-code-sm text-on-surface-variant">Docker Desktop 4.26.1 (131620) | CPU: 12% | RAM: 4.2GB / 16GB</span>
+<div class="flex gap-4">
+<a class="font-code-sm text-code-sm text-secondary dark:text-secondary hover:text-primary cursor-default Transition-all duration-150 flex items-center gap-1" href="#">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span> Engine: Running
+            </a>
+<a class="font-code-sm text-code-sm text-secondary dark:text-secondary hover:text-primary cursor-default Transition-all duration-150" href="#">
+                Disk: 84% Used
+            </a>
+</div>
+</footer>
+</body></html>

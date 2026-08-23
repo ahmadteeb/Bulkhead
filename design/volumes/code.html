@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Volumes - Dockyard</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-secondary": "#163440",
+                      "tertiary-fixed": "#ebdcff",
+                      "outline": "#87929a",
+                      "surface-tint": "#70d2ff",
+                      "tertiary-container": "#bc97ff",
+                      "on-primary-container": "#00445b",
+                      "surface-container-highest": "#333538",
+                      "inverse-on-surface": "#2f3034",
+                      "secondary-container": "#304d5a",
+                      "on-tertiary-fixed-variant": "#572e99",
+                      "tertiary-fixed-dim": "#d4bbff",
+                      "on-tertiary": "#3f0f81",
+                      "on-secondary-fixed": "#001f2a",
+                      "on-background": "#e2e2e6",
+                      "on-secondary-container": "#9fbdcc",
+                      "background": "#111316",
+                      "error-container": "#93000a",
+                      "on-secondary-fixed-variant": "#2e4b57",
+                      "on-surface": "#e2e2e6",
+                      "primary-container": "#0db7ed",
+                      "error": "#ffb4ab",
+                      "on-primary": "#003547",
+                      "outline-variant": "#3d484f",
+                      "surface-container-high": "#282a2d",
+                      "surface-container-low": "#1a1c1f",
+                      "on-tertiary-container": "#4e2490",
+                      "on-error": "#690005",
+                      "secondary-fixed": "#c9e7f7",
+                      "surface-dim": "#111316",
+                      "inverse-surface": "#e2e2e6",
+                      "primary-fixed-dim": "#70d2ff",
+                      "on-surface-variant": "#bcc8d0",
+                      "inverse-primary": "#006686",
+                      "on-primary-fixed": "#001e2b",
+                      "tertiary": "#d4bbff",
+                      "secondary-fixed-dim": "#adcbda",
+                      "surface-container-lowest": "#0c0e11",
+                      "surface-variant": "#333538",
+                      "on-error-container": "#ffdad6",
+                      "primary": "#70d2ff",
+                      "surface-container": "#1e2023",
+                      "primary-fixed": "#c0e8ff",
+                      "secondary": "#adcbda",
+                      "on-primary-fixed-variant": "#004d66",
+                      "surface": "#111316",
+                      "on-tertiary-fixed": "#260058",
+                      "surface-bright": "#37393d"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "container-padding": "24px",
+                      "unit": "4px",
+                      "sidebar-width": "260px",
+                      "density-compact": "8px",
+                      "sidebar-collapsed": "64px",
+                      "density-comfortable": "12px",
+                      "gutter": "16px"
+              },
+              "fontFamily": {
+                      "body-sm": [
+                              "Hanken Grotesk"
+                      ],
+                      "code-sm": [
+                              "JetBrains Mono"
+                      ],
+                      "label-caps": [
+                              "Hanken Grotesk"
+                      ],
+                      "headline-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "title-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "code-md": [
+                              "JetBrains Mono"
+                      ],
+                      "headline-lg": [
+                              "Hanken Grotesk"
+                      ],
+                      "body-md": [
+                              "Hanken Grotesk"
+                      ]
+              },
+              "fontSize": {
+                      "body-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "code-sm": [
+                              "11px",
+                              {
+                                      "lineHeight": "14px",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "label-caps": [
+                              "11px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "title-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "code-md": [
+                              "13px",
+                              {
+                                      "lineHeight": "18px",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+    </script>
+<style>
+        @import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@500&display=swap');
+    </style>
+</head>
+<body class="bg-background dark:bg-background text-on-background dark:text-on-background font-body-sm text-body-sm h-screen overflow-hidden flex flex-col">
+<!-- App Container -->
+<div class="flex flex-1 overflow-hidden">
+<!-- SideNavBar -->
+<nav class="hidden md:flex w-sidebar-width h-screen sticky left-0 top-0 border-r border-outline-variant dark:border-outline-variant flex-col py-density-comfortable bg-background dark:bg-background z-20 shrink-0">
+<!-- Header -->
+<div class="px-gutter mb-6 flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-primary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-primary text-xl" style="font-variation-settings: 'FILL' 1;">sailing</span>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary leading-tight">Dockyard</h1>
+<p class="font-code-sm text-code-sm text-on-surface-variant">Engine 24.0.7</p>
+</div>
+</div>
+<!-- Navigation Links -->
+<div class="flex-1 flex flex-col gap-1 px-3">
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-body-md text-body-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">view_in_ar</span>
+<span class="font-body-md text-body-md">Containers</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">layers</span>
+<span class="font-body-md text-body-md">Images</span>
+</a>
+<!-- Active Link -->
+<a class="flex items-center gap-3 px-3 py-2 rounded bg-primary/10 text-primary border-l-2 border-primary font-bold opacity-90 transition-all" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">storage</span>
+<span class="font-body-md text-body-md">Volumes</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">lan</span>
+<span class="font-body-md text-body-md">Networks</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">account_tree</span>
+<span class="font-body-md text-body-md">Compose Stacks</span>
+</a>
+</div>
+<!-- Bottom Settings -->
+<div class="px-3 mt-auto pt-4 border-t border-outline-variant">
+<a class="flex items-center gap-3 px-3 py-2 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-body-md text-body-md">Settings</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col h-full w-full relative z-10 overflow-hidden">
+<!-- TopAppBar -->
+<header class="w-full sticky top-0 z-30 border-b border-outline-variant dark:border-outline-variant bg-surface-container-low dark:bg-surface-container-low flex justify-between items-center px-gutter py-density-compact shrink-0 h-[60px]">
+<div class="flex items-center gap-4">
+<h2 class="font-headline-md text-headline-md font-black text-on-surface dark:text-on-surface">Volumes</h2>
+</div>
+<div class="flex items-center gap-4">
+<!-- Search Bar -->
+<div class="relative hidden sm:block">
+<span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">search</span>
+<input class="bg-surface-container-lowest border border-outline-variant rounded pl-8 pr-3 py-1.5 text-body-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary w-64 transition-all bg-transparent" placeholder="Search volumes..." type="text"/>
+</div>
+<!-- Actions -->
+<div class="flex items-center gap-2 border-l border-outline-variant pl-4 ml-2">
+<button class="bg-primary text-on-primary hover:bg-primary-fixed transition-colors rounded px-4 py-1.5 font-label-caps text-label-caps flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]">add</span>
+                            Create Volume
+                        </button>
+<button class="text-on-surface-variant hover:bg-surface-container-highest transition-all rounded p-1.5 flex items-center justify-center group" title="Prune System">
+<span class="material-symbols-outlined text-[20px] group-hover:text-primary transition-colors">cleaning_services</span>
+</button>
+</div>
+<!-- Icons -->
+<div class="flex items-center gap-1 border-l border-outline-variant pl-4">
+<button class="text-on-surface-variant hover:text-on-surface p-1.5 rounded hover:bg-surface-container-highest transition-all">
+<span class="material-symbols-outlined text-[20px]">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:text-on-surface p-1.5 rounded hover:bg-surface-container-highest transition-all">
+<span class="material-symbols-outlined text-[20px]">help_outline</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Scrollable Canvas -->
+<div class="flex-1 overflow-y-auto bg-background p-container-padding pb-16">
+<!-- Bento Stats Grid -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+<div class="bg-surface-container-low rounded-lg p-4 border border-outline-variant">
+<div class="flex items-center justify-between mb-2">
+<span class="font-label-caps text-label-caps text-on-surface-variant">Total Volumes</span>
+<span class="material-symbols-outlined text-primary">storage</span>
+</div>
+<div class="font-headline-lg text-headline-lg font-bold text-on-surface">24</div>
+</div>
+<div class="bg-surface-container-low rounded-lg p-4 border border-outline-variant">
+<div class="flex items-center justify-between mb-2">
+<span class="font-label-caps text-label-caps text-on-surface-variant">Active Volumes</span>
+<span class="material-symbols-outlined text-green-400">check_circle</span>
+</div>
+<div class="font-headline-lg text-headline-lg font-bold text-on-surface">18</div>
+</div>
+<div class="bg-surface-container-low rounded-lg p-4 border border-outline-variant">
+<div class="flex items-center justify-between mb-2">
+<span class="font-label-caps text-label-caps text-on-surface-variant">Total Size</span>
+<span class="material-symbols-outlined text-on-surface-variant">hard_drive</span>
+</div>
+<div class="font-headline-lg text-headline-lg font-bold text-on-surface">4.2 GB</div>
+</div>
+</div>
+<!-- Table Container -->
+<div class="bg-surface-container-low border border-outline-variant rounded-lg overflow-hidden flex flex-col">
+<!-- Table Toolbar -->
+<div class="px-4 py-3 border-b border-outline-variant flex justify-between items-center bg-surface-container">
+<h3 class="font-title-md text-title-md text-on-surface">Local Volumes</h3>
+<div class="flex gap-2">
+<button class="text-on-surface-variant hover:text-on-surface px-2 py-1 rounded hover:bg-surface-container-high transition-colors flex items-center gap-1 font-body-sm text-body-sm border border-outline-variant">
+<span class="material-symbols-outlined text-[16px]">filter_list</span>
+                                Filter
+                            </button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-outline-variant bg-surface-container-highest">
+<th class="px-density-comfortable py-density-compact font-label-caps text-label-caps text-on-surface-variant font-medium whitespace-nowrap">Name</th>
+<th class="px-density-comfortable py-density-compact font-label-caps text-label-caps text-on-surface-variant font-medium">Driver</th>
+<th class="px-density-comfortable py-density-compact font-label-caps text-label-caps text-on-surface-variant font-medium hidden sm:table-cell">Mountpoint</th>
+<th class="px-density-comfortable py-density-compact font-label-caps text-label-caps text-on-surface-variant font-medium">Size</th>
+<th class="px-density-comfortable py-density-compact font-label-caps text-label-caps text-on-surface-variant font-medium">In Use By</th>
+<th class="px-density-comfortable py-density-compact font-label-caps text-label-caps text-on-surface-variant font-medium text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container-high transition-colors group">
+<td class="px-density-comfortable py-density-compact">
+<div class="font-code-md text-code-md text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-primary">folder</span>
+                                            postgres_data
+                                        </div>
+</td>
+<td class="px-density-comfortable py-density-compact text-on-surface-variant">local</td>
+<td class="px-density-comfortable py-density-compact text-on-surface-variant hidden sm:table-cell font-code-sm text-code-sm truncate max-w-[200px]" title="/var/lib/docker/volumes/postgres_data/_data">/var/lib/docker/volumes/postg...</td>
+<td class="px-density-comfortable py-density-compact text-on-surface-variant">256 MB</td>
+<td class="px-density-comfortable py-density-compact">
+<div class="flex gap-1 flex-wrap">
+<a class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-colors font-code-sm text-code-sm" href="#">db_prod</a>
+</div>
+</td>
+<td class="px-density-comfortable py-density-compact text-right">
+<div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 rounded text-on-surface-variant hover:text-primary hover:bg-surface-container-highest transition-colors" title="Inspect">
+<span class="material-symbols-outlined text-[18px]">info</span>
+</button>
+<button class="p-1 rounded text-on-surface-variant hover:text-error hover:bg-error-container/20 transition-colors" title="Remove">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container-high transition-colors group">
+<td class="px-density-comfortable py-density-compact">
+<div class="font-code-md text-code-md text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-primary">folder</span>
+                                            redis_cache
+                                        </div>
+</td>
+<td class="px-density-comfortable py-density-compact text-on-surface-variant">local</td>
+<td class="px-density-comfortable py-density-compact text-on-surface-variant hidden sm:table-cell font-code-sm text-code-sm truncate max-w-[200px]" title="/var/lib/docker/volumes/redis_cache/_data">/var/lib/docker/volumes/redis...</td>
+<td class="px-density-comfortable py-density-compact text-on-surface-variant">12 MB</td>
+<td class="px-density-comfortable py-density-compact">
+<div class="flex gap-1 flex-wrap">
+<a class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-colors font-code-sm text-code-sm" href="#">cache_node_1</a>
+<a class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-colors font-code-sm text-code-sm" href="#">cache_node_2</a>
+</div>
+</td>
+<td class="px-density-comfortable py-density-compact text-right">
+<div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 rounded text-on-surface-variant hover:text-primary hover:bg-surface-container-highest transition-colors" title="Inspect">
+<span class="material-symbols-outlined text-[18px]">info</span>
+</button>
+<button class="p-1 rounded text-on-surface-variant hover:text-error hover:bg-error-container/20 transition-colors" title="Remove">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-container-high transition-colors group bg-surface-container/30">
+<td class="px-density-comfortable py-density-compact">
+<div class="font-code-md text-code-md text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-outline">folder_off</span>
+                                            orphaned_data_backup
+                                        </div>
+</td>
+<td class="px-density-comfortable py-density-compact text-on-surface-variant">local</td>
+<td class="px-density-comfortable py-density-compact text-on-surface-variant hidden sm:table-cell font-code-sm text-code-sm truncate max-w-[200px]" title="/var/lib/docker/volumes/orphaned_data_backup/_data">/var/lib/docker/volumes/orpha...</td>
+<td class="px-density-comfortable py-density-compact text-on-surface-variant">1.2 GB</td>
+<td class="px-density-comfortable py-density-compact">
+<span class="text-outline italic text-xs">Unused</span>
+</td>
+<td class="px-density-comfortable py-density-compact text-right">
+<div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 rounded text-on-surface-variant hover:text-primary hover:bg-surface-container-highest transition-colors" title="Inspect">
+<span class="material-symbols-outlined text-[18px]">info</span>
+</button>
+<button class="p-1 rounded text-on-surface-variant hover:text-error hover:bg-error-container/20 transition-colors" title="Remove">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- Footer Status Bar -->
+<footer class="fixed bottom-0 w-full h-8 z-40 border-t border-outline-variant dark:border-outline-variant bg-surface-container-lowest dark:bg-surface-container-lowest flex justify-between items-center px-gutter">
+<div class="font-code-sm text-code-sm text-on-surface-variant">Docker Desktop 4.26.1 (131620) | CPU: 12% | RAM: 4.2GB / 16GB</div>
+<div class="flex gap-4 font-code-sm text-code-sm text-secondary dark:text-secondary">
+<span class="hover:text-primary cursor-default transition-all duration-150 flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-green-500"></span> Engine: Running
+            </span>
+<span class="hover:text-primary cursor-default transition-all duration-150">Disk: 84% Used</span>
+</div>
+</footer>
+</body></html>
