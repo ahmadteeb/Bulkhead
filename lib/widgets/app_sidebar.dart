@@ -201,9 +201,9 @@ class AppSidebar extends ConsumerWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.15),
+                    color: AppColors.primary.withAlpha(38),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.primary.withOpacity(0.5)),
+                    border: Border.all(color: AppColors.primary.withAlpha(128)),
                   ),
                   child: Row(
                     children: [
