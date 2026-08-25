@@ -1,0 +1,66 @@
+name: Build macOS Desktop Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Check Flutter version
+        run: flutter --version
+
+      - name: Install Pub dependencies
+        run: flutter pub get
+
+      - name: Run Static Analysis
+        run: flutter analyze
+
+      - name: Run Unit Tests
+        run: flutter test
+
+      - name: Build macOS Desktop Release
+        run: flutter build macos --release
+
+      - name: Package macOS App Bundle
+        run: |
+          mkdir -p release
+          RAW_TAG="${GITHUB_REF#refs/tags/v}"
+          VERSION="${RAW_TAG:-1.0.0}"
+
+          cd build/macos/Build/Products/Release
+          zip -r ../../../../../release/bulkhead-macos-app.zip Bulkhead.app
+          cd ../../../../../
+
+          # Create DMG Image
+          hdiutil create -volname Bulkhead -srcfolder build/macos/Build/Products/Release/Bulkhead.app -ov -format UDZO release/bulkhead-macos-${VERSION}.dmg
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bulkhead-macos-packages
+          path: release/*
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -2,12 +2,12 @@
   <img src="screenshots/logo.png" alt="Bulkhead Logo" width="380" />
 </p>
 
-<h1 align="center">🚀 Bulkhead — Flutter Docker Manager for Linux 🐳</h1>
+<h1 align="center">🚀 Bulkhead — Cross-Platform Docker Manager (Linux, macOS, Windows) 🐳</h1>
 
 <p align="center">
   <a href="https://flutter.dev"><img src="https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter" alt="Flutter" /></a>
-  <a href="https://archlinux.org"><img src="https://img.shields.io/badge/Platform-Linux%20Desktop-FCC624?logo=linux" alt="Platform" /></a>
-  <a href="https://www.docker.com"><img src="https://img.shields.io/badge/Docker-Native%20Unix%20Socket-2496ED?logo=docker" alt="Docker" /></a>
+  <a href="https://archlinux.org"><img src="https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-FCC624?logo=linux" alt="Platform" /></a>
+  <a href="https://www.docker.com"><img src="https://img.shields.io/badge/Docker-Native%20Engine%20Socket-2496ED?logo=docker" alt="Docker" /></a>
   <a href="https://riverpod.dev"><img src="https://img.shields.io/badge/Riverpod-2.x-3C873A" alt="Riverpod" /></a>
   <a href="https://github.com/ahmadteeb/Bulkhead/releases"><img src="https://img.shields.io/github/v/release/ahmadteeb/Bulkhead?color=FF6F00&logo=github" alt="GitHub Release" /></a>
 </p>
@@ -16,14 +16,14 @@
   <a href="https://www.buymeacoffee.com/ahmadteeb" target="_blank"><img src="https://img.shields.io/badge/Buy_Me_A_Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me A Coffee" /></a>
 </p>
 
-**Bulkhead** is a state-of-the-art desktop Linux Docker Engine manager built with **Flutter Desktop**. It provides high-performance, real-time container administration, multi-container Compose stack management, local image registry inspection, persistent volume control, virtual network topology visualization, embedded interactive terminal emulation, container volume file browsing with upload/download capabilities, and single-click system storage optimization.
+**Bulkhead** is a state-of-the-art desktop Docker Engine manager built with **Flutter Desktop** for **Linux**, **macOS**, and **Windows**. It provides high-performance, real-time container administration, multi-container Compose stack management, local image registry inspection, persistent volume control, virtual network topology visualization, embedded interactive terminal emulation, container volume file browsing with upload/download capabilities, and single-click system storage optimization.
 
 ---
 
 ## ✨ Key Highlights
 
 - ⚡ **100% Real-Time Event-Driven (Zero Polling Overhead)**: Listens continuously to the Docker Engine socket stream (`/events`) to instantly refresh containers, images, volumes, networks, and compose stacks without background timers or screen flickering.
-- 🔌 **Direct Native Unix Socket Connection**: Connects directly to `/var/run/docker.sock` over Unix domain sockets using HTTP/1.1 chunked response demuxing, bypassing external daemon proxy layers.
+- 🔌 **Direct Native Socket Connection**: Connects directly to local Docker Unix domain sockets (`/var/run/docker.sock`, Docker Desktop / OrbStack / Colima socket paths) or Windows Named Pipes using HTTP/1.1 chunked response demuxing.
 - 💻 **Embedded Interactive Container Terminal (`xterm`)**: Native terminal emulator with PTY allocation (`script` wrapper), shell selector (`/bin/bash`, `/bin/sh`, `zsh`, `ash`), ANSI escape code stripping, normalized `\r\n` line endings, right-click context menu (**Copy Output**, **Paste Stdin**), and external terminal launcher.
 - 📁 **Container Volume File Browser & File Manager**: Explore container volumes, root file systems, and bind mounts. Features **Back (`<`)** & **Forward (`>`)** directory history navigation, **Upload File** (`docker cp`), and **Download File/Folder** to host system folders. Accessible from container details and the Volumes page.
 - 🚀 **Full Docker Compose CLI Integration**: Manage multi-container application stacks (`docker compose up -d`, `down`, `restart`, `down -v --remove-orphans`). Includes a Deploy Stack wizard with an inline `docker-compose.yml` editor.
@@ -99,7 +99,7 @@ Configure local Docker Unix domain socket paths (`/var/run/docker.sock`), test s
 |---|---|
 | **Real-Time Engine Sync** | 100% event-driven sync via `/events` socket stream; zero polling timers. |
 | **Containers** | List, filter, start, stop, restart, remove, multi-select bulk actions, run new container modal. |
-| **Interactive Terminal** | `xterm: ^4.0.0` emulator, Linux PTY allocation (`script`), `/bin/bash`/`/bin/sh`/`zsh` shells, right-click context menu, clean ANSI escape filter, external terminal launcher. |
+| **Interactive Terminal** | `xterm: ^4.0.0` emulator, Linux/macOS PTY allocation (`script`), `/bin/bash`/`/bin/sh`/`zsh` shells, right-click context menu, clean ANSI escape filter, external terminal launcher. |
 | **Volume File Manager** | Browse attached container volumes & host mountpoints, Back/Forward navigation stack, Upload host files (`docker cp`), Download files & directories (`docker cp`). |
 | **Container Telemetry** | Dual-mode stdout/stderr live logs, raw Inspect JSON viewer, environment variable table, port mapping table. |
 | **Compose Stacks** | List stacks, Up/Down/Restart/Delete, Deploy Stack wizard, inline YAML editor, service log stream, unified green status badges. |
@@ -114,19 +114,25 @@ Configure local Docker Unix domain socket paths (`/var/run/docker.sock`), test s
 
 ### 📋 Prerequisites
 
-- **OS**: Linux (Arch Linux, Ubuntu 22.04+, Debian, Fedora, Manjaro).
-- **Docker Engine**: Installed & running locally (`/var/run/docker.sock`).
-- **Permissions**: Current user must belong to the `docker` usergroup:
-  ```bash
-  sudo usermod -aG docker $USER
-  newgrp docker
-  ```
+- **Docker Engine / Docker Desktop**: Installed & running locally.
+- **Supported OS**: Linux (Arch, Ubuntu, Debian, Fedora), macOS 11+, Windows 10/11.
 
 ---
 
 ### 📦 Installation Options
 
-Choose the installation method for your Linux distribution from [GitHub Releases](https://github.com/ahmadteeb/Bulkhead/releases):
+Choose the pre-built installer for your operating system from [GitHub Releases](https://github.com/ahmadteeb/Bulkhead/releases):
+
+#### 🍏 macOS (`.dmg` or `.zip`)
+Download `bulkhead-macos-<version>.dmg` or `bulkhead-macos-app.zip` from [GitHub Releases](https://github.com/ahmadteeb/Bulkhead/releases):
+1. Open `bulkhead-macos-<version>.dmg`.
+2. Drag **Bulkhead.app** into your `/Applications` folder.
+3. Launch Bulkhead from Spotlight or Launchpad.
+
+#### 🪟 Windows (`.zip`)
+Download `bulkhead-windows-x64.zip` from [GitHub Releases](https://github.com/ahmadteeb/Bulkhead/releases):
+1. Extract `bulkhead-windows-x64.zip` to your preferred directory (e.g., `C:\Program Files\Bulkhead`).
+2. Run `bulkhead.exe`.
 
 #### 🌀 Ubuntu / Debian / Linux Mint / Pop!_OS (`.deb`)
 Download `bulkhead_<version>_amd64.deb` and install via `apt`:
@@ -161,21 +167,6 @@ cd ~/bulkhead
 ./bulkhead
 ```
 
-*(Optional Desktop Launcher for Portable ZIP)*:
-```bash
-mkdir -p ~/.local/share/applications
-cat <<EOF > ~/.local/share/applications/bulkhead.desktop
-[Desktop Entry]
-Name=Bulkhead
-Comment=Flutter Docker Manager for Linux
-Exec=$HOME/bulkhead/bulkhead
-Icon=$HOME/bulkhead/data/flutter_assets/assets/icon.png
-Terminal=false
-Type=Application
-Categories=Development;System;
-EOF
-```
-
 ---
 
 ### 🚀 Building & Running from Source
@@ -193,22 +184,26 @@ flutter analyze
 flutter test
 
 # 4. Run Desktop Application locally
-flutter run -d linux
+flutter run -d linux   # Linux
+flutter run -d macos   # macOS
+flutter run -d windows # Windows
 
-# 5. Build Release Linux Desktop Bundle
-flutter build linux --release
+# 5. Build Release Desktop Bundle
+flutter build linux --release   # Linux
+flutter build macos --release   # macOS
+flutter build windows --release # Windows
 ```
 
 ---
 
 ## 🏗️ Technical Architecture
 
-- **UI Framework**: Flutter Desktop (Linux X11/Wayland GTK runner).
+- **UI Framework**: Flutter Desktop (Linux GTK, macOS Cocoa, Windows Win32 runners).
 - **State Management**: Riverpod 2.x (`StateNotifierProvider`, `StreamProvider`, `FutureProvider`).
-- **Terminal Emulator**: `xterm: ^4.0.0` with Linux PTY pseudo-terminal allocation (`script -q -c "docker exec -it ..."`).
+- **Terminal Emulator**: `xterm: ^4.0.0` with PTY pseudo-terminal allocation (`script -q -c "docker exec -it ..."`).
 - **File Manager**: `file_picker` package paired with `docker cp` process execution.
-- **Packaging Pipeline**: GitHub Actions automated `.deb` (Debian/Ubuntu), `.rpm` (Fedora/RHEL), `.pkg.tar.zst` (Arch Linux), `.zip` (Portable Linux), and AUR `PKGBUILD`.
-- **Socket I/O**: Custom `DockerSocketConnection` implementing HTTP/1.1 over Unix Domain Sockets (`Socket.connect(InternetAddress('/var/run/docker.sock', InternetAddressType.unix), 0)`).
+- **Multi-Platform CI/CD Pipelines**: GitHub Actions workflows building macOS (`.dmg`, `.zip`), Windows (`.zip`), Linux (`.deb`, `.rpm`, `.pkg.tar.zst`, `.zip`), and AUR `PKGBUILD`.
+- **Socket I/O**: Custom `DockerSocketConnection` implementing HTTP/1.1 over Unix Domain Sockets and local Docker IPC pipes.
 - **Stream Demuxing**: 8-byte multiplexing header demuxer parsing `stdout` (stream type `1`) and `stderr` (stream type `2`) from Docker container log streams.
 - **Typography**: Google Fonts (`Hanken Grotesk` headings, `JetBrains Mono` telemetry).
 
