@@ -243,5 +243,5 @@ Distributed under the **MIT License**. See [LICENSE](LICENSE) for details.
 ```text
 MIT License
 
-Copyright (c) 2026 Ahmad Teeb
+Copyright (c) 2026 Ahmad El-Khatib (AhmadTeeb)
 ```
