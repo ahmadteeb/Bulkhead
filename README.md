@@ -2,7 +2,7 @@
   <img src="screenshots/logo.png" alt="Bulkhead Logo" width="380" />
 </p>
 
-<h1 align="center">🚀 Bulkhead — Cross-Platform Docker Manager (Linux, macOS, Windows) 🐳</h1>
+<h1 align="center">🚀 Bulkhead — Flutter Docker Manager for Linux, macOS & Windows 🐳</h1>
 
 <p align="center">
   <a href="https://flutter.dev"><img src="https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter" alt="Flutter" /></a>
@@ -23,8 +23,8 @@
 ## ✨ Key Highlights
 
 - ⚡ **100% Real-Time Event-Driven (Zero Polling Overhead)**: Listens continuously to the Docker Engine socket stream (`/events`) to instantly refresh containers, images, volumes, networks, and compose stacks without background timers or screen flickering.
-- 🔌 **Direct Native Socket Connection**: Connects directly to local Docker Unix domain sockets (`/var/run/docker.sock`, Docker Desktop / OrbStack / Colima socket paths) or Windows Named Pipes using HTTP/1.1 chunked response demuxing.
-- 💻 **Embedded Interactive Container Terminal (`xterm`)**: Native terminal emulator with PTY allocation (`script` wrapper), shell selector (`/bin/bash`, `/bin/sh`, `zsh`, `ash`), ANSI escape code stripping, normalized `\r\n` line endings, right-click context menu (**Copy Output**, **Paste Stdin**), and external terminal launcher.
+- 🔌 **Direct Native Socket Connection**: Connects directly to local Docker Unix domain sockets (`/var/run/docker.sock`, Docker Desktop / OrbStack / Colima socket paths) or Windows Named Pipes (`\\.\pipe\docker_engine`) using HTTP/1.1 chunked response demuxing.
+- 💻 **Embedded Interactive Container Terminal (`xterm`)**: Native terminal emulator with PTY allocation (`script` wrapper), shell selector (`/bin/bash`, `/bin/sh`, `zsh`, `ash`), ANSI escape code stripping, normalized `\r\n` line endings, right-click context menu (**Copy Output**, **Paste Stdin**), and external terminal launcher (macOS Terminal, Windows CMD, Linux terminals).
 - 📁 **Container Volume File Browser & File Manager**: Explore container volumes, root file systems, and bind mounts. Features **Back (`<`)** & **Forward (`>`)** directory history navigation, **Upload File** (`docker cp`), and **Download File/Folder** to host system folders. Accessible from container details and the Volumes page.
 - 🚀 **Full Docker Compose CLI Integration**: Manage multi-container application stacks (`docker compose up -d`, `down`, `restart`, `down -v --remove-orphans`). Includes a Deploy Stack wizard with an inline `docker-compose.yml` editor.
 - 📦 **Multi-Selection & Bulk Actions**: Select multiple containers, images, volumes, or networks with Select-All header checkboxes to perform batch operations (Start, Stop, Restart, Delete).
@@ -32,6 +32,18 @@
 - 🏷️ **Unified Status Badge System**: Standardized status badge colors (`AppColors.success` green for all running stack & container states) and responsive sizing across all screens.
 - 🧹 **1-Click Storage Optimization**: Dynamic progress bars calculated from `docker system df` metrics with a single-click **System Prune All** button to reclaim unused disk space.
 - 🎨 **Modern Dark & Light Themes**: Dark mode interface designed according to `#111316` surface specifications, paired with crisp `Hanken Grotesk` headings and `JetBrains Mono` code telemetry.
+
+---
+
+## 🔌 Platform Docker Socket Locations
+
+Bulkhead automatically detects and connects to the Docker Engine daemon across all operating systems:
+
+| Platform | Default Socket / IPC Path | Supported Runtimes |
+|---|---|---|
+| 🐧 **Linux** | `/var/run/docker.sock` | Docker Engine, Podman |
+| 🍏 **macOS** | `/var/run/docker.sock`<br>`~/.docker/run/docker.sock`<br>`~/.orbstack/run/docker.sock`<br>`~/.colima/default/docker.sock` | Docker Desktop for Mac,<br>OrbStack, Colima |
+| 🪟 **Windows** | `\\.\pipe\docker_engine`<br>`tcp://localhost:2375` | Docker Desktop for Windows,<br>WSL2 Engine |
 
 ---
 
@@ -87,7 +99,7 @@ Visualize virtual bridge, host, overlay, and macvlan networks. Inspect subnets, 
 ---
 
 ### ⚙️ 8. System Settings & Connection Configuration
-Configure local Docker Unix domain socket paths (`/var/run/docker.sock`), test socket permissions, and switch theme modes (**Dark**, **Light**, **System Default**).
+Configure local Docker Unix domain socket paths, test socket permissions, and switch theme modes (**Dark**, **Light**, **System Default**).
 
 ![Settings Screen](screenshots/settings.png)
 
@@ -132,7 +144,7 @@ Download `bulkhead-macos-<version>.dmg` or `bulkhead-macos-app.zip` from [GitHub
 #### 🪟 Windows (`.zip`)
 Download `bulkhead-windows-x64.zip` from [GitHub Releases](https://github.com/ahmadteeb/Bulkhead/releases):
 1. Extract `bulkhead-windows-x64.zip` to your preferred directory (e.g., `C:\Program Files\Bulkhead`).
-2. Run `bulkhead.exe`.
+2. Run `Bulkhead.exe`.
 
 #### 🌀 Ubuntu / Debian / Linux Mint / Pop!_OS (`.deb`)
 Download `bulkhead_<version>_amd64.deb` and install via `apt`:
@@ -203,7 +215,7 @@ flutter build windows --release # Windows
 - **Terminal Emulator**: `xterm: ^4.0.0` with PTY pseudo-terminal allocation (`script -q -c "docker exec -it ..."`).
 - **File Manager**: `file_picker` package paired with `docker cp` process execution.
 - **Multi-Platform CI/CD Pipelines**: GitHub Actions workflows building macOS (`.dmg`, `.zip`), Windows (`.zip`), Linux (`.deb`, `.rpm`, `.pkg.tar.zst`, `.zip`), and AUR `PKGBUILD`.
-- **Socket I/O**: Custom `DockerSocketConnection` implementing HTTP/1.1 over Unix Domain Sockets and local Docker IPC pipes.
+- **Socket I/O**: Custom `DockerSocketConnection` implementing HTTP/1.1 over Unix Domain Sockets and Windows Named Pipes (`\\.\pipe\docker_engine`).
 - **Stream Demuxing**: 8-byte multiplexing header demuxer parsing `stdout` (stream type `1`) and `stderr` (stream type `2`) from Docker container log streams.
 - **Typography**: Google Fonts (`Hanken Grotesk` headings, `JetBrains Mono` telemetry).
 

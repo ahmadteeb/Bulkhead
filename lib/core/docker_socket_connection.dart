@@ -36,10 +36,42 @@ class RawHttpResponse {
 class DockerSocketConnection {
   final String socketPath;
 
-  DockerSocketConnection({this.socketPath = '/var/run/docker.sock'});
+  static String get defaultSocketPath {
+    if (Platform.isWindows) {
+      return r'\\.\pipe\docker_engine';
+    } else if (Platform.isMacOS) {
+      final home = Platform.environment['HOME'] ?? '';
+      final userSock = '$home/.docker/run/docker.sock';
+      if (File(userSock).existsSync()) return userSock;
+
+      final orbstackSock = '$home/.orbstack/run/docker.sock';
+      if (File(orbstackSock).existsSync()) return orbstackSock;
+
+      final colimaSock = '$home/.colima/default/docker.sock';
+      if (File(colimaSock).existsSync()) return colimaSock;
+
+      return '/var/run/docker.sock';
+    }
+    return '/var/run/docker.sock';
+  }
+
+  DockerSocketConnection({String? socketPath})
+      : socketPath = socketPath ?? defaultSocketPath;
 
   Future<Socket> _connectSocket() async {
     try {
+      if (socketPath.startsWith('tcp://') || socketPath.startsWith('http://')) {
+        final uri = Uri.parse(socketPath);
+        return await Socket.connect(uri.host, uri.port != 0 ? uri.port : 2375);
+      }
+      if (Platform.isWindows) {
+        try {
+          return await Socket.connect(InternetAddress.loopbackIPv4, 2375);
+        } catch (_) {
+          final address = InternetAddress(socketPath, type: InternetAddressType.unix);
+          return await Socket.connect(address, 0);
+        }
+      }
       final address = InternetAddress(socketPath, type: InternetAddressType.unix);
       return await Socket.connect(address, 0);
     } on SocketException catch (e) {

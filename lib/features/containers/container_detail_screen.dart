@@ -22,6 +22,20 @@ Future<void> launchNativeContainerTerminal(
   final shortId = containerId.length >= 12
       ? containerId.substring(0, 12)
       : containerId;
+
+  if (Platform.isMacOS) {
+    try {
+      final script = 'tell application "Terminal" to do script "docker exec -it $shortId $shell"';
+      await Process.run('osascript', ['-e', script]);
+      return;
+    } catch (_) {}
+  } else if (Platform.isWindows) {
+    try {
+      await Process.start('cmd.exe', ['/c', 'start', 'cmd.exe', '/k', 'docker exec -it $shortId $shell']);
+      return;
+    } catch (_) {}
+  }
+
   final execCmd =
       'docker exec -it $shortId $shell || docker exec -it $shortId sh';
 
@@ -724,16 +738,18 @@ class _ContainerExecViewState extends State<_ContainerExecView> {
       final shortId = widget.containerId.length >= 12
           ? widget.containerId.substring(0, 12)
           : widget.containerId;
-      try {
-        final scriptCheck = await Process.run('which', ['script']);
-        if (scriptCheck.exitCode == 0) {
+      if (Platform.isMacOS) {
+        try {
           _process = await Process.start('script', [
             '-q',
-            '-c',
-            'docker exec -it $shortId $_selectedShell',
             '/dev/null',
+            'docker',
+            'exec',
+            '-it',
+            shortId,
+            _selectedShell,
           ]);
-        } else {
+        } catch (_) {
           _process = await Process.start('docker', [
             'exec',
             '-i',
@@ -743,7 +759,38 @@ class _ContainerExecViewState extends State<_ContainerExecView> {
             _selectedShell,
           ]);
         }
-      } catch (_) {
+      } else if (Platform.isLinux) {
+        try {
+          final scriptCheck = await Process.run('which', ['script']);
+          if (scriptCheck.exitCode == 0) {
+            _process = await Process.start('script', [
+              '-q',
+              '-c',
+              'docker exec -it $shortId $_selectedShell',
+              '/dev/null',
+            ]);
+          } else {
+            _process = await Process.start('docker', [
+              'exec',
+              '-i',
+              '-e',
+              'TERM=xterm-256color',
+              shortId,
+              _selectedShell,
+            ]);
+          }
+        } catch (_) {
+          _process = await Process.start('docker', [
+            'exec',
+            '-i',
+            '-e',
+            'TERM=xterm-256color',
+            shortId,
+            _selectedShell,
+          ]);
+        }
+      } else {
+        // Windows
         _process = await Process.start('docker', [
           'exec',
           '-i',
