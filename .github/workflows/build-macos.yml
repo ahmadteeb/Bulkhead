@@ -39,7 +39,11 @@ jobs:
         run: flutter test
 
       - name: Build macOS Desktop Release
-        run: flutter build macos --release
+        run: |
+          RAW_TAG="${GITHUB_REF#refs/tags/v}"
+          VERSION="${RAW_TAG:-1.0.0}"
+          BUILD_NUM="${GITHUB_RUN_NUMBER:-1}"
+          flutter build macos --release --build-name=$VERSION --build-number=$BUILD_NUM
 
       - name: Package macOS App Bundle (.dmg & .zip)
         run: |

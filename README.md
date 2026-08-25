@@ -16,13 +16,14 @@
   <a href="https://www.buymeacoffee.com/ahmadteeb" target="_blank"><img src="https://img.shields.io/badge/Buy_Me_A_Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me A Coffee" /></a>
 </p>
 
-**Bulkhead** is a state-of-the-art desktop Docker Engine manager built with **Flutter Desktop** for **Linux**, **macOS**, and **Windows**. It provides high-performance, real-time container administration, multi-container Compose stack management, local image registry inspection, persistent volume control, virtual network topology visualization, embedded interactive terminal emulation, container volume file browsing with upload/download capabilities, and single-click system storage optimization.
+**Bulkhead** is a state-of-the-art desktop Docker Engine manager built with **Flutter Desktop** for **Linux**, **macOS**, and **Windows**. It provides high-performance, real-time container administration, multi-container Compose stack management, local image registry inspection, persistent volume control, virtual network topology visualization, embedded interactive terminal emulation, container volume file browsing with upload/download capabilities, single-click system storage optimization, and automated Over-The-Air (OTA) updates.
 
 ---
 
 ## ✨ Key Highlights
 
 - ⚡ **100% Real-Time Event-Driven (Zero Polling Overhead)**: Listens continuously to the Docker Engine socket stream (`/events`) to instantly refresh containers, images, volumes, networks, and compose stacks without background timers or screen flickering.
+- 🔄 **Automated Over-The-Air (OTA) In-App Updates**: Queries GitHub Releases API at startup to display an **Update Available** pill badge, changelog inspector, and direct download links for `.dmg`, `.zip`, `.deb`, `.rpm`, or `.pkg.tar.zst` packages.
 - 🔌 **Direct Native Socket Connection**: Connects directly to local Docker Unix domain sockets (`/var/run/docker.sock`, Docker Desktop / OrbStack / Colima socket paths) or Windows Named Pipes (`\\.\pipe\docker_engine`) using HTTP/1.1 chunked response demuxing.
 - 💻 **Embedded Interactive Container Terminal (`xterm`)**: Native terminal emulator with PTY allocation (`script` wrapper), shell selector (`/bin/bash`, `/bin/sh`, `zsh`, `ash`), ANSI escape code stripping, normalized `\r\n` line endings, right-click context menu (**Copy Output**, **Paste Stdin**), and external terminal launcher (macOS Terminal, Windows CMD, Linux terminals).
 - 📁 **Container Volume File Browser & File Manager**: Explore container volumes, root file systems, and bind mounts. Features **Back (`<`)** & **Forward (`>`)** directory history navigation, **Upload File** (`docker cp`), and **Download File/Folder** to host system folders. Accessible from container details and the Volumes page.
@@ -99,7 +100,7 @@ Visualize virtual bridge, host, overlay, and macvlan networks. Inspect subnets, 
 ---
 
 ### ⚙️ 8. System Settings & Connection Configuration
-Configure local Docker Unix domain socket paths, test socket permissions, and switch theme modes (**Dark**, **Light**, **System Default**).
+Configure local Docker Unix domain socket paths, test socket permissions, check for software updates, and switch theme modes (**Dark**, **Light**, **System Default**).
 
 ![Settings Screen](screenshots/settings.png)
 
@@ -110,6 +111,7 @@ Configure local Docker Unix domain socket paths, test socket permissions, and sw
 | Area | Feature & Capability |
 |---|---|
 | **Real-Time Engine Sync** | 100% event-driven sync via `/events` socket stream; zero polling timers. |
+| **Over-The-Air (OTA) Updates** | Auto-checks GitHub Releases API; in-app update notification pill, changelog viewer, direct asset downloads. |
 | **Containers** | List, filter, start, stop, restart, remove, multi-select bulk actions, run new container modal. |
 | **Interactive Terminal** | `xterm: ^4.0.0` emulator, Linux/macOS PTY allocation (`script`), `/bin/bash`/`/bin/sh`/`zsh` shells, right-click context menu, clean ANSI escape filter, external terminal launcher. |
 | **Volume File Manager** | Browse attached container volumes & host mountpoints, Back/Forward navigation stack, Upload host files (`docker cp`), Download files & directories (`docker cp`). |
@@ -200,10 +202,10 @@ flutter run -d linux   # Linux
 flutter run -d macos   # macOS
 flutter run -d windows # Windows
 
-# 5. Build Release Desktop Bundle
-flutter build linux --release   # Linux
-flutter build macos --release   # macOS
-flutter build windows --release # Windows
+# 5. Build Release Desktop Bundle with Build Version Arguments
+flutter build linux --release --build-name=1.0.0 --build-number=1   # Linux
+flutter build macos --release --build-name=1.0.0 --build-number=1   # macOS
+flutter build windows --release --build-name=1.0.0 --build-number=1 # Windows
 ```
 
 ---
@@ -212,9 +214,11 @@ flutter build windows --release # Windows
 
 - **UI Framework**: Flutter Desktop (Linux GTK, macOS Cocoa, Windows Win32 runners).
 - **State Management**: Riverpod 2.x (`StateNotifierProvider`, `StreamProvider`, `FutureProvider`).
+- **Build Versioning**: Dynamic build number and build name resolution parsed via `package_info_plus` at runtime.
+- **OTA Updates**: GitHub Releases API parser (`UpdateNotifier`), in-app update notification pill, changelog inspector (`UpdateDialog`), and direct platform asset launcher.
 - **Terminal Emulator**: `xterm: ^4.0.0` with PTY pseudo-terminal allocation (`script -q -c "docker exec -it ..."`).
 - **File Manager**: `file_picker` package paired with `docker cp` process execution.
-- **Multi-Platform CI/CD Pipelines**: GitHub Actions workflows building macOS (`.dmg`, `.zip`), Windows (`.zip`), Linux (`.deb`, `.rpm`, `.pkg.tar.zst`, `.zip`), and AUR `PKGBUILD`.
+- **Multi-Platform CI/CD Pipelines**: GitHub Actions workflows passing `--build-name=$VERSION --build-number=$BUILD_NUM` and packaging macOS (`.dmg`, `.zip`), Windows (`.zip`), Linux (`.deb`, `.rpm`, `.pkg.tar.zst`, `.zip`), and AUR `PKGBUILD`.
 - **Socket I/O**: Custom `DockerSocketConnection` implementing HTTP/1.1 over Unix Domain Sockets and Windows Named Pipes (`\\.\pipe\docker_engine`).
 - **Stream Demuxing**: 8-byte multiplexing header demuxer parsing `stdout` (stream type `1`) and `stderr` (stream type `2`) from Docker container log streams.
 - **Typography**: Google Fonts (`Hanken Grotesk` headings, `JetBrains Mono` telemetry).

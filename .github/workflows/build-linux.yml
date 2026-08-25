@@ -41,7 +41,11 @@ jobs:
         run: flutter test
 
       - name: Build Linux Desktop Release
-        run: flutter build linux --release
+        run: |
+          RAW_TAG="${GITHUB_REF#refs/tags/v}"
+          VERSION="${RAW_TAG:-1.0.0}"
+          BUILD_NUM="${GITHUB_RUN_NUMBER:-1}"
+          flutter build linux --release --build-name=$VERSION --build-number=$BUILD_NUM
 
       - name: Package Linux Desktop Bundles (.zip, .deb, .rpm, .pkg.tar.zst)
         run: |

@@ -3,9 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../core/app_version.dart';
+import '../../models/update_model.dart';
 import '../../providers/connection_status_provider.dart';
 import '../../providers/settings_provider.dart';
+import '../../providers/update_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/update_dialog.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -248,8 +252,99 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ],
             ),
           ),
+          const SizedBox(height: 24),
+
+          // Software Updates Card
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: cardBgColor,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: borderColor),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.system_update_rounded, color: primaryColor),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Software Updates & Version',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Bulkhead Desktop v${AppVersion.currentVersion}',
+                          style: GoogleFonts.jetBrainsMono(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Over-the-Air (OTA) release channel',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      icon: const Icon(Icons.refresh_rounded, size: 16),
+                      label: const Text('Check for Updates'),
+                      onPressed: () async {
+                        final messenger = ScaffoldMessenger.of(context);
+                        final notifier = ref.read(updateCheckNotifierProvider.notifier);
+                        await notifier.checkForUpdates(forceUserCheck: true);
+                        if (!mounted) return;
+                        final updateState = ref.read(updateCheckNotifierProvider);
+                        final updateInfo = updateState.value;
+                        if (updateInfo != null) {
+                          if (updateInfo.hasUpdate) {
+                            _showUpdateDialog(updateInfo);
+                          } else {
+                            messenger.showSnackBar(
+                              const SnackBar(
+                                content: Text('Bulkhead is up to date! 🎉'),
+                                backgroundColor: AppColors.success,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ],
       ),
+    );
+  }
+
+  void _showUpdateDialog(UpdateInfoModel info) {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (_) => UpdateDialog(updateInfo: info),
     );
   }
 

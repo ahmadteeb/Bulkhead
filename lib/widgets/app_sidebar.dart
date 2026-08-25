@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/connection_status_provider.dart';
+import '../providers/update_provider.dart';
 import '../theme/app_theme.dart';
+import 'update_dialog.dart';
 
 class AppSidebarItem {
   final String title;
@@ -39,6 +41,8 @@ class AppSidebar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final connState = ref.watch(connectionStatusProvider);
+    final updateState = ref.watch(updateCheckNotifierProvider);
+    final updateInfo = updateState.value;
     final isDark = AppColors.isDark(context);
 
     return Container(
@@ -183,7 +187,48 @@ class AppSidebar extends ConsumerWidget {
 
           Divider(height: 1, color: AppColors.borderColor(context)),
 
-          // Daemon Status Footer
+          if (updateInfo != null && updateInfo.hasUpdate)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: InkWell(
+                onTap: () {
+                  showDialog(
+                    context: context,
+                    builder: (_) => UpdateDialog(updateInfo: updateInfo),
+                  );
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.primary.withOpacity(0.5)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.system_update_rounded,
+                        color: AppColors.primary,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Update: v${updateInfo.latestVersion}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? AppColors.darkPrimary : AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          // Connection Status Footer
           Padding(
             padding: const EdgeInsets.all(16),
             child: Container(
