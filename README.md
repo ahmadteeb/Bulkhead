@@ -9,6 +9,7 @@
   <a href="https://archlinux.org"><img src="https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-FCC624?logo=linux" alt="Platform" /></a>
   <a href="https://www.docker.com"><img src="https://img.shields.io/badge/Docker-Native%20Engine%20Socket-2496ED?logo=docker" alt="Docker" /></a>
   <a href="https://riverpod.dev"><img src="https://img.shields.io/badge/Riverpod-2.x-3C873A" alt="Riverpod" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
   <a href="https://github.com/ahmadteeb/Bulkhead/releases"><img src="https://img.shields.io/github/v/release/ahmadteeb/Bulkhead?color=FF6F00&logo=github" alt="GitHub Release" /></a>
 </p>
 
@@ -237,4 +238,10 @@ If you find **Bulkhead** useful and would like to support its ongoing developmen
 
 ## 📄 License
 
-Distributed under the MIT License. See `LICENSE` for details.
+Distributed under the **MIT License**. See [LICENSE](LICENSE) for details.
+
+```text
+MIT License
+
+Copyright (c) 2026 Ahmad Teeb
+```
