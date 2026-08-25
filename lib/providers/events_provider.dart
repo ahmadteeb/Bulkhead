@@ -24,6 +24,7 @@ class DockerEventsNotifier extends StateNotifier<List<DockerEventModel>> {
   final dynamic _client;
   final Ref _ref;
   StreamSubscription? _sub;
+  Timer? _reconnectTimer;
   bool _isDisposed = false;
 
   DockerEventsNotifier(this._client, this._ref) : super([]) {
@@ -33,6 +34,7 @@ class DockerEventsNotifier extends StateNotifier<List<DockerEventModel>> {
   void _subscribe() {
     if (_isDisposed || !mounted) return;
     _sub?.cancel();
+    _reconnectTimer?.cancel();
 
     try {
       final stream = _client.streamEvents();
@@ -63,7 +65,8 @@ class DockerEventsNotifier extends StateNotifier<List<DockerEventModel>> {
 
   void _scheduleReconnect() {
     if (_isDisposed || !mounted) return;
-    Future.delayed(const Duration(seconds: 2), () {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(const Duration(seconds: 2), () {
       if (!_isDisposed && mounted) {
         _subscribe();
       }
@@ -73,6 +76,7 @@ class DockerEventsNotifier extends StateNotifier<List<DockerEventModel>> {
   @override
   void dispose() {
     _isDisposed = true;
+    _reconnectTimer?.cancel();
     _sub?.cancel();
     super.dispose();
   }
