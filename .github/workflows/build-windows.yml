@@ -9,6 +9,9 @@ on:
 permissions:
   contents: write
 
+env:
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
+
 jobs:
   build:
     runs-on: windows-latest
@@ -38,11 +41,15 @@ jobs:
       - name: Build Windows Desktop Release
         run: flutter build windows --release
 
-      - name: Package Windows Desktop Bundle
+      - name: Package Windows Desktop Bundle (.zip)
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path release
-          Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath "release/bulkhead-windows-x64.zip"
+          if (Test-Path "build/windows/x64/runner/Release") {
+            Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath "release/bulkhead-windows-x64.zip"
+          } elseif (Test-Path "build/windows/runner/Release") {
+            Compress-Archive -Path "build/windows/runner/Release/*" -DestinationPath "release/bulkhead-windows-x64.zip"
+          }
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4

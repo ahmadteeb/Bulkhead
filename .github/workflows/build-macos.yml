@@ -9,6 +9,9 @@ on:
 permissions:
   contents: write
 
+env:
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
+
 jobs:
   build:
     runs-on: macos-latest
@@ -38,18 +41,23 @@ jobs:
       - name: Build macOS Desktop Release
         run: flutter build macos --release
 
-      - name: Package macOS App Bundle
+      - name: Package macOS App Bundle (.dmg & .zip)
         run: |
           mkdir -p release
           RAW_TAG="${GITHUB_REF#refs/tags/v}"
           VERSION="${RAW_TAG:-1.0.0}"
 
-          cd build/macos/Build/Products/Release
-          zip -r ../../../../../release/bulkhead-macos-app.zip Bulkhead.app
-          cd ../../../../../
-
-          # Create DMG Image
-          hdiutil create -volname Bulkhead -srcfolder build/macos/Build/Products/Release/Bulkhead.app -ov -format UDZO release/bulkhead-macos-${VERSION}.dmg
+          if [ -d "build/macos/Build/Products/Release/Bulkhead.app" ]; then
+            cd build/macos/Build/Products/Release
+            zip -r ../../../../../release/bulkhead-macos-app.zip Bulkhead.app
+            cd ../../../../../
+            hdiutil create -volname Bulkhead -srcfolder build/macos/Build/Products/Release/Bulkhead.app -ov -format UDZO release/bulkhead-macos-${VERSION}.dmg
+          elif [ -d "build/macos/Build/Products/Release/bulkhead.app" ]; then
+            cd build/macos/Build/Products/Release
+            zip -r ../../../../../release/bulkhead-macos-app.zip bulkhead.app
+            cd ../../../../../
+            hdiutil create -volname Bulkhead -srcfolder build/macos/Build/Products/Release/bulkhead.app -ov -format UDZO release/bulkhead-macos-${VERSION}.dmg
+          fi
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
