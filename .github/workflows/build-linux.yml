@@ -89,26 +89,11 @@ jobs:
           Categories=Development;System;
           EOF
 
-          dpkg-deb --build "$DEB_DIR" "release/bulkhead_${VERSION}_amd64.deb"
+          dpkg-deb --root-owner-group --build "$DEB_DIR" "release/bulkhead_${VERSION}_amd64.deb"
 
           # 3. Package RedHat/Fedora .rpm
-          RPM_ROOT="rpm_dist/BUILDROOT/bulkhead-${VERSION}-1.x86_64"
-          mkdir -p "rpm_dist/BUILD" "rpm_dist/RPMS" "rpm_dist/SOURCES" "rpm_dist/SPECS" "$RPM_ROOT/opt/bulkhead" "$RPM_ROOT/usr/bin" "$RPM_ROOT/usr/share/applications"
-
-          cp -r build/linux/x64/release/bundle/* "$RPM_ROOT/opt/bulkhead/"
-          chmod +x "$RPM_ROOT/opt/bulkhead/bulkhead"
-          ln -s /opt/bulkhead/bulkhead "$RPM_ROOT/usr/bin/bulkhead"
-
-          cat <<EOF > "$RPM_ROOT/usr/share/applications/bulkhead.desktop"
-          [Desktop Entry]
-          Name=Bulkhead
-          Comment=Flutter Docker Manager for Linux
-          Exec=/usr/bin/bulkhead
-          Icon=/opt/bulkhead/data/flutter_assets/assets/icon.png
-          Terminal=false
-          Type=Application
-          Categories=Development;System;
-          EOF
+          mkdir -p rpm_dist/{BUILD,RPMS,SOURCES,SPECS}
+          cp -a "$DEB_DIR/opt" "$DEB_DIR/usr" rpm_dist/SOURCES/
 
           cat <<EOF > "rpm_dist/SPECS/bulkhead.spec"
           Name:           bulkhead
@@ -121,7 +106,12 @@ jobs:
           %description
           State-of-the-art Flutter Docker Engine Manager for Linux
 
+          %install
+          mkdir -p "%{buildroot}"
+          cp -a "%{_sourcedir}/opt" "%{_sourcedir}/usr" "%{buildroot}/"
+
           %files
+          %defattr(-,root,root,-)
           /opt/bulkhead
           /usr/bin/bulkhead
           /usr/share/applications/bulkhead.desktop
