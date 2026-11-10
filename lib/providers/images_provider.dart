@@ -8,11 +8,7 @@ class ImagesState {
   final bool isLoading;
   final String? error;
 
-  ImagesState({
-    required this.images,
-    this.isLoading = false,
-    this.error,
-  });
+  ImagesState({required this.images, this.isLoading = false, this.error});
 
   ImagesState copyWith({
     List<ImageModel>? images,
@@ -44,27 +40,33 @@ final filteredImagesProvider = Provider<List<ImageModel>>((ref) {
 class ImagesNotifier extends StateNotifier<ImagesState> {
   final dynamic _client;
   final bool _isConnected;
+  int _refreshGeneration = 0;
 
   ImagesNotifier(this._client, this._isConnected)
-      : super(ImagesState(images: [], isLoading: true)) {
+    : super(ImagesState(images: [], isLoading: true)) {
     if (_isConnected) {
       refreshImages();
     } else {
-      state = ImagesState(images: [], isLoading: false, error: 'Docker daemon disconnected');
+      state = ImagesState(
+        images: [],
+        isLoading: false,
+        error: 'Docker daemon disconnected',
+      );
     }
   }
 
   Future<void> refreshImages({bool silent = false}) async {
     if (!mounted) return;
+    final generation = ++_refreshGeneration;
     if (!silent) {
       state = state.copyWith(isLoading: true, error: null);
     }
     try {
       final list = await _client.getImages(showAll: true);
-      if (!mounted) return;
+      if (!mounted || generation != _refreshGeneration) return;
       state = ImagesState(images: list, isLoading: false, error: null);
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || generation != _refreshGeneration) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
@@ -98,7 +100,7 @@ class ImagesNotifier extends StateNotifier<ImagesState> {
 
 final imagesNotifierProvider =
     StateNotifierProvider<ImagesNotifier, ImagesState>((ref) {
-  final client = ref.watch(dockerApiClientProvider);
-  final connState = ref.watch(connectionStatusProvider);
-  return ImagesNotifier(client, connState.isConnected);
-});
+      final client = ref.watch(dockerApiClientProvider);
+      final connState = ref.watch(connectionStatusProvider);
+      return ImagesNotifier(client, connState.isConnected);
+    });

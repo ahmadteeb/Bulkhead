@@ -8,11 +8,7 @@ class NetworksState {
   final bool isLoading;
   final String? error;
 
-  NetworksState({
-    required this.networks,
-    this.isLoading = false,
-    this.error,
-  });
+  NetworksState({required this.networks, this.isLoading = false, this.error});
 
   NetworksState copyWith({
     List<NetworkModel>? networks,
@@ -45,27 +41,33 @@ final filteredNetworksProvider = Provider<List<NetworkModel>>((ref) {
 class NetworksNotifier extends StateNotifier<NetworksState> {
   final dynamic _client;
   final bool _isConnected;
+  int _refreshGeneration = 0;
 
   NetworksNotifier(this._client, this._isConnected)
-      : super(NetworksState(networks: [], isLoading: true)) {
+    : super(NetworksState(networks: [], isLoading: true)) {
     if (_isConnected) {
       refreshNetworks();
     } else {
-      state = NetworksState(networks: [], isLoading: false, error: 'Docker daemon disconnected');
+      state = NetworksState(
+        networks: [],
+        isLoading: false,
+        error: 'Docker daemon disconnected',
+      );
     }
   }
 
   Future<void> refreshNetworks({bool silent = false}) async {
     if (!mounted) return;
+    final generation = ++_refreshGeneration;
     if (!silent) {
       state = state.copyWith(isLoading: true, error: null);
     }
     try {
       final list = await _client.getNetworks();
-      if (!mounted) return;
+      if (!mounted || generation != _refreshGeneration) return;
       state = NetworksState(networks: list, isLoading: false, error: null);
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || generation != _refreshGeneration) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
@@ -101,7 +103,7 @@ class NetworksNotifier extends StateNotifier<NetworksState> {
 
 final networksNotifierProvider =
     StateNotifierProvider<NetworksNotifier, NetworksState>((ref) {
-  final client = ref.watch(dockerApiClientProvider);
-  final connState = ref.watch(connectionStatusProvider);
-  return NetworksNotifier(client, connState.isConnected);
-});
+      final client = ref.watch(dockerApiClientProvider);
+      final connState = ref.watch(connectionStatusProvider);
+      return NetworksNotifier(client, connState.isConnected);
+    });

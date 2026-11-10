@@ -21,19 +21,25 @@
 
 ---
 
+## Workspace redesign and review
+
+The workspace now has grouped navigation with a compact rail, shared responsive page headers, consistent light/dark controls, and tables that scroll horizontally at smaller widths. Operation results and errors use dialogs, with progress dialogs for active actions. See [the design system](docs/design-system.md) and [the latest bug and enhancement review](docs/bug-review.md) for implementation details, fixes, validation, and open issues.
+
+Connections support Unix sockets on Linux/macOS, direct Windows named pipes, and explicitly configured TCP endpoints. Windows pipe code and Windows-only integration tests are included; native Windows validation must run on Windows. Multi-file Compose stacks preserve file order and provide a selector for editing individual configuration files.
+
 ## ✨ Key Highlights
 
-- ⚡ **100% Real-Time Event-Driven (Zero Polling Overhead)**: Listens continuously to the Docker Engine socket stream (`/events`) to instantly refresh containers, images, volumes, networks, and compose stacks without background timers or screen flickering.
+- ⚡ **100% Real-Time Event-Driven (Zero Polling Overhead)**: Listens continuously to the Docker Engine socket stream (`/events`) to instantly refresh containers, images, volumes, networks, and compose stacks with short batched refreshes for affected resource groups.
 - 🔄 **Automated Over-The-Air (OTA) In-App Updates**: Queries GitHub Releases API at startup to display an **Update Available** pill badge, changelog inspector, and direct download links for `.dmg`, `.zip`, `.deb`, `.rpm`, or `.pkg.tar.zst` packages.
-- 🔌 **Direct Native Socket Connection**: Connects directly to local Docker Unix domain sockets (`/var/run/docker.sock`, Docker Desktop / OrbStack / Colima socket paths) or Windows Named Pipes (`\\.\pipe\docker_engine`) using HTTP/1.1 chunked response demuxing.
+- 🔌 **Direct Native Socket Connection**: Connects directly to local Docker Unix domain sockets (`/var/run/docker.sock`, Docker Desktop / OrbStack / Colima socket paths) or an explicitly configured TCP endpoint using Dart’s HTTP client for HTTP framing and chunk decoding.
 - 💻 **Embedded Interactive Container Terminal (`xterm`)**: Native terminal emulator with PTY allocation (`script` wrapper), shell selector (`/bin/bash`, `/bin/sh`, `zsh`, `ash`), ANSI escape code stripping, normalized `\r\n` line endings, right-click context menu (**Copy Output**, **Paste Stdin**), and external terminal launcher (macOS Terminal, Windows CMD, Linux terminals).
 - 📁 **Container Volume File Browser & File Manager**: Explore container volumes, root file systems, and bind mounts. Features **Back (`<`)** & **Forward (`>`)** directory history navigation, **Upload File** (`docker cp`), and **Download File/Folder** to host system folders. Accessible from container details and the Volumes page.
 - 🚀 **Full Docker Compose CLI Integration**: Manage multi-container application stacks (`docker compose up -d`, `down`, `restart`, `down -v --remove-orphans`). Includes a Deploy Stack wizard with an inline `docker-compose.yml` editor.
 - 📦 **Multi-Selection & Bulk Actions**: Select multiple containers, images, volumes, or networks with Select-All header checkboxes to perform batch operations (Start, Stop, Restart, Delete).
 - 📜 **Dual-Mode Log Telemetry & Demuxing**: Real-time stdout/stderr log streaming supporting both TTY and non-TTY multiplexed stream frames with auto-scrolling and log text copying.
 - 🏷️ **Unified Status Badge System**: Standardized status badge colors (`AppColors.success` green for all running stack & container states) and responsive sizing across all screens.
-- 🧹 **1-Click Storage Optimization**: Dynamic progress bars calculated from `docker system df` metrics with a single-click **System Prune All** button to reclaim unused disk space.
-- 🎨 **Modern Dark & Light Themes**: Dark mode interface designed according to `#111316` surface specifications, paired with crisp `Hanken Grotesk` headings and `JetBrains Mono` code telemetry.
+- 🧹 **1-Click Storage Optimization**: Dynamic progress bars calculated from `docker system df` metrics with a single-click **Clean up** button to reclaim unused disk space.
+- 🎨 **Modern Dark & Light Themes**: Navy dark surfaces and a blue/slate light theme, paired with crisp `Hanken Grotesk` headings and `JetBrains Mono` code telemetry.
 
 ---
 
@@ -45,16 +51,16 @@ Bulkhead automatically detects and connects to the Docker Engine daemon across a
 |---|---|---|
 | 🐧 **Linux** | `/var/run/docker.sock` | Docker Engine, Podman |
 | 🍏 **macOS** | `/var/run/docker.sock`<br>`~/.docker/run/docker.sock`<br>`~/.orbstack/run/docker.sock`<br>`~/.colima/default/docker.sock` | Docker Desktop for Mac,<br>OrbStack, Colima |
-| 🪟 **Windows** | `\\.\pipe\docker_engine`<br>`tcp://localhost:2375` | Docker Desktop for Windows,<br>WSL2 Engine |
+| 🪟 **Windows** | `\\.\pipe\docker_engine` or explicit `tcp://` endpoint | Docker Desktop / WSL2; native pipe validation pending on Windows |
 
 ---
 
 ## 🖼️ Feature Tour & Screenshots
 
-### 📊 1. Dashboard Overview
+### 📊 1. Overview
 Inspect real-time system metrics, active container slots, `docker system df` storage usage bars, 1-click **Prune System**, and live Docker Engine `/events` stream telemetry.
 
-![Dashboard Overview](screenshots/dashboard.png)
+![Overview](screenshots/overview.png)
 
 ---
 
@@ -76,6 +82,9 @@ Deep dive into container telemetry with stdout/stderr log streaming, **Embedded 
 Deploy and manage multi-container Compose applications. View service health, stream service terminal logs, edit `docker-compose.yml` directly, and perform full stack lifecycle controls (**Up**, **Down**, **Restart**, **Purge/Delete**).
 
 ![Compose Stacks Management](screenshots/compose.png)
+
+Profiles are shown under each stack’s configuration path. Click **Available profiles**, choose the optional profiles, and click **Apply** before Up, Down, Restart, or Delete. The deployment dialog also accepts comma-separated profiles. The app discovers profile names from `docker compose config --profiles`; service and log views include existing containers from every profile. Changing the selection does not change running containers until you perform an action. Use **Refresh** after changing profile definitions outside the app. Choices are kept for the current app session; the app does not infer the exact flags used in a previous external CLI command.
+
 
 ---
 
@@ -107,6 +116,8 @@ Configure local Docker Unix domain socket paths, test socket permissions, check 
 
 ---
 
+Container file browsing requires `sh` and `stat -c` inside the container. Listings preserve spaces, Unicode, newlines, and shell characters in filenames, and failed directory commands are reported as errors.
+
 ## 🛠️ Feature Matrix Summary
 
 | Area | Feature & Capability |
@@ -121,7 +132,7 @@ Configure local Docker Unix domain socket paths, test socket permissions, check 
 | **Images** | Inspect tags/sizes, Pull Image modal with terminal progress, Run Container from Image, Prune unused images. |
 | **Volumes** | List mountpoints, create volume modal, remove, multi-select delete, Prune unused volumes, integrated File Browser. |
 | **Networks** | List network topology, driver selector (`bridge`, `host`, `overlay`, `macvlan`), subnet/gateway inspector. |
-| **Storage Optimization** | Dynamic `docker system df` usage bars, 1-click **Prune System** (`docker system prune -a --volumes`). |
+| **Storage Optimization** | Dynamic `docker system df` usage bars, 1-click **Prune System** (stopped containers, dangling images, unused anonymous volumes, and unused networks). |
 
 ---
 
@@ -220,7 +231,7 @@ flutter build windows --release --build-name=1.0.0 --build-number=1 # Windows
 - **Terminal Emulator**: `xterm: ^4.0.0` with PTY pseudo-terminal allocation (`script -q -c "docker exec -it ..."`).
 - **File Manager**: `file_picker` package paired with `docker cp` process execution.
 - **Multi-Platform CI/CD Pipelines**: GitHub Actions workflows passing `--build-name=$VERSION --build-number=$BUILD_NUM` and packaging macOS (`.dmg`, `.zip`), Windows (`.zip`), Linux (`.deb`, `.rpm`, `.pkg.tar.zst`, `.zip`), and AUR `PKGBUILD`.
-- **Socket I/O**: Custom `DockerSocketConnection` implementing HTTP/1.1 over Unix Domain Sockets and Windows Named Pipes (`\\.\pipe\docker_engine`).
+- **Socket I/O**: Custom `DockerSocketConnection` using Dart’s HTTP client over Unix domain sockets or explicit TCP endpoints. Windows named pipes use cancellable overlapped Win32 I/O.
 - **Stream Demuxing**: 8-byte multiplexing header demuxer parsing `stdout` (stream type `1`) and `stderr` (stream type `2`) from Docker container log streams.
 - **Typography**: Google Fonts (`Hanken Grotesk` headings, `JetBrains Mono` telemetry).
 

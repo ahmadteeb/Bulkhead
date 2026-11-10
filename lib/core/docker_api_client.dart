@@ -7,12 +7,13 @@ import '../models/image_model.dart';
 import '../models/network_model.dart';
 import '../models/volume_model.dart';
 import 'docker_socket_connection.dart';
+import 'docker_endpoint.dart';
 
 class DockerApiClient {
   final DockerSocketConnection _socket;
 
   DockerApiClient({DockerSocketConnection? socket})
-      : _socket = socket ?? DockerSocketConnection();
+    : _socket = socket ?? DockerSocketConnection();
 
   /// Ping Docker engine to test connection
   Future<bool> ping() async {
@@ -30,11 +31,15 @@ class DockerApiClient {
     );
 
     if (!res.isSuccess) {
-      throw Exception('Failed to list containers: ${res.statusCode} ${res.body}');
+      throw Exception(
+        'Failed to list containers: ${res.statusCode} ${res.body}',
+      );
     }
 
     final List<dynamic> decoded = jsonDecode(res.body);
-    return decoded.map((item) => ContainerModel.fromJson(item as Map<String, dynamic>)).toList();
+    return decoded
+        .map((item) => ContainerModel.fromJson(item as Map<String, dynamic>))
+        .toList();
   }
 
   /// Create and start a container (`POST /containers/create`)
@@ -50,10 +55,12 @@ class DockerApiClient {
 
     if (portMappings != null) {
       portMappings.forEach((containerPort, hostPort) {
-        final key = containerPort.contains('/') ? containerPort : '$containerPort/tcp';
+        final key = containerPort.contains('/')
+            ? containerPort
+            : '$containerPort/tcp';
         exposedPorts[key] = {};
         portBindings[key] = [
-          {'HostPort': hostPort}
+          {'HostPort': hostPort},
         ];
       });
     }
@@ -85,14 +92,23 @@ class DockerApiClient {
     final id = map['Id'] as String;
 
     if (autoStart) {
-      await startContainer(id);
+      try {
+        await startContainer(id);
+      } catch (error) {
+        throw StateError(
+          'Container "$name" ($id) was created but could not start: $error',
+        );
+      }
     }
     return id;
   }
 
   /// Inspect a single container
   Future<Map<String, dynamic>> inspectContainer(String id) async {
-    final res = await _socket.request(method: 'GET', path: '/containers/$id/json');
+    final res = await _socket.request(
+      method: 'GET',
+      path: '/containers/$id/json',
+    );
     if (!res.isSuccess) {
       throw Exception('Failed to inspect container $id: ${res.body}');
     }
@@ -101,7 +117,10 @@ class DockerApiClient {
 
   /// Start a container
   Future<void> startContainer(String id) async {
-    final res = await _socket.request(method: 'POST', path: '/containers/$id/start');
+    final res = await _socket.request(
+      method: 'POST',
+      path: '/containers/$id/start',
+    );
     if (!res.isSuccess && res.statusCode != 304) {
       throw Exception('Failed to start container: ${res.body}');
     }
@@ -109,7 +128,10 @@ class DockerApiClient {
 
   /// Stop a container
   Future<void> stopContainer(String id) async {
-    final res = await _socket.request(method: 'POST', path: '/containers/$id/stop');
+    final res = await _socket.request(
+      method: 'POST',
+      path: '/containers/$id/stop',
+    );
     if (!res.isSuccess && res.statusCode != 304) {
       throw Exception('Failed to stop container: ${res.body}');
     }
@@ -117,7 +139,10 @@ class DockerApiClient {
 
   /// Restart a container
   Future<void> restartContainer(String id) async {
-    final res = await _socket.request(method: 'POST', path: '/containers/$id/restart');
+    final res = await _socket.request(
+      method: 'POST',
+      path: '/containers/$id/restart',
+    );
     if (!res.isSuccess) {
       throw Exception('Failed to restart container: ${res.body}');
     }
@@ -127,7 +152,8 @@ class DockerApiClient {
   Future<void> removeContainer(String id, {bool force = false}) async {
     final res = await _socket.request(
       method: 'DELETE',
-      path: '/containers/$id?v=1&force=${force ? 1 : 0}',
+      // Keep attached volumes unless the user explicitly removes them in Volumes.
+      path: '/containers/$id?v=0&force=${force ? 1 : 0}',
     );
     if (!res.isSuccess) {
       throw Exception('Failed to remove container: ${res.body}');
@@ -135,51 +161,67 @@ class DockerApiClient {
   }
 
   /// Stream live container logs with HTTP chunk header stripping and 8-byte frame demuxer
-  Stream<String> streamContainerLogs(String id, {int tail = 200, bool follow = true}) async* {
-    final path = '/containers/$id/logs?follow=${follow ? "true" : "false"}&stdout=true&stderr=true&timestamps=true&tail=$tail';
+  Stream<String> streamContainerLogs(
+    String id, {
+    int tail = 200,
+    bool follow = true,
+  }) async* {
+    final info = await inspectContainer(id);
+    final tty = (info['Config'] as Map<String, dynamic>?)?['Tty'] == true;
+    final path =
+        '/containers/$id/logs?follow=$follow&stdout=true&stderr=true&timestamps=true&tail=$tail';
     final stream = _socket.streamResponse(method: 'GET', path: path);
+    yield* _logPayload(
+      stream,
+      tty: tty,
+    ).transform(utf8.decoder).transform(const LineSplitter());
+  }
 
-    final lineBuffer = StringBuffer();
-
+  Stream<List<int>> _logPayload(
+    Stream<List<int>> stream, {
+    required bool tty,
+  }) async* {
+    if (tty) {
+      yield* stream;
+      return;
+    }
+    var pending = <int>[];
+    var remaining = 0;
     await for (final chunk in stream) {
-      final rawText = utf8.decode(chunk, allowMalformed: true);
-      lineBuffer.write(rawText);
-
-      final content = lineBuffer.toString();
-      final lines = content.split('\n');
-
-      lineBuffer.clear();
-      lineBuffer.write(lines.last);
-
-      for (int i = 0; i < lines.length - 1; i++) {
-        String line = lines[i].replaceAll('\r', '').trim();
-        if (line.isEmpty) continue;
-
-        // 1. Strip HTTP chunk length hex lines (e.g., "84", "6f", "28", "42")
-        final isHexChunkHeader = RegExp(r'^[0-9a-fA-F]{1,6}$').hasMatch(line);
-        if (isHexChunkHeader) continue;
-
-        // 2. Strip 8-byte Docker stream header prefix (e.g. "\x01\x00\x00\x00...")
-        if (line.length > 8 && (line.startsWith('\x01') || line.startsWith('\x02') || line.startsWith('\x00'))) {
-          line = line.substring(8).trim();
+      pending.addAll(chunk);
+      while (true) {
+        if (remaining == 0) {
+          if (pending.length < 8) break;
+          remaining =
+              (pending[4] << 24) |
+              (pending[5] << 16) |
+              (pending[6] << 8) |
+              pending[7];
+          pending = pending.sublist(8);
+          if (remaining == 0) continue;
         }
-
-        // 3. Filter remaining control character junk at start of line
-        line = line.replaceAll(RegExp(r'^[\x00-\x1F\x7F-\x9F]+'), '').trim();
-
-        if (line.isNotEmpty) {
-          yield line;
-        }
+        if (pending.isEmpty) break;
+        final count = pending.length < remaining ? pending.length : remaining;
+        yield pending.sublist(0, count);
+        pending = pending.sublist(count);
+        remaining -= count;
       }
+    }
+    if (remaining != 0 || pending.isNotEmpty) {
+      throw const FormatException('Incomplete Docker log frame');
     }
   }
 
   /// Create an exec instance inside a running container
-  Future<String> createExec(String containerId, List<String> cmd) async {
+  Future<String> createExec(
+    String containerId,
+    List<String> cmd, {
+    bool tty = true,
+  }) async {
     final body = jsonEncode({
       'AttachStdout': true,
       'AttachStderr': true,
-      'Tty': true,
+      'Tty': tty,
       'Cmd': cmd,
     });
     final res = await _socket.request(
@@ -196,8 +238,8 @@ class DockerApiClient {
   }
 
   /// Start an exec instance and stream output text
-  Stream<String> startExec(String execId) async* {
-    final body = jsonEncode({'Detach': false, 'Tty': true});
+  Stream<String> startExec(String execId, {bool tty = true}) async* {
+    final body = jsonEncode({'Detach': false, 'Tty': tty});
     final stream = _socket.streamResponse(
       method: 'POST',
       path: '/exec/$execId/start',
@@ -205,56 +247,76 @@ class DockerApiClient {
       headers: {'Content-Type': 'application/json'},
     );
 
-    await for (final chunk in stream) {
-      final text = utf8.decode(chunk, allowMalformed: true);
-      for (final line in text.split('\n')) {
-        final cleaned = line.replaceAll('\r', '').trim();
-        if (cleaned.isNotEmpty && !RegExp(r'^[0-9a-fA-F]{1,6}$').hasMatch(cleaned)) {
-          yield line;
-        }
-      }
-    }
+    yield* utf8.decoder.bind(_logPayload(stream, tty: tty));
   }
 
   /// Execute command inside container CLI using selected shell and return full output
-  Future<String> execCommand(String containerId, String command, {String shell = 'sh'}) async {
-    final execId = await createExec(containerId, [shell, '-c', command]);
+  Future<String> execCommand(
+    String containerId,
+    String command, {
+    String shell = 'sh',
+  }) async {
+    final execId = await createExec(containerId, [
+      shell,
+      '-c',
+      command,
+    ], tty: false);
     final buffer = StringBuffer();
-    await for (final line in startExec(execId)) {
-      buffer.writeln(line);
+    await for (final chunk in startExec(execId, tty: false)) {
+      buffer.write(chunk);
+    }
+    final status = await _socket.request(
+      method: 'GET',
+      path: '/exec/$execId/json',
+    );
+    if (!status.isSuccess) {
+      throw StateError('Unable to inspect command exit status: ${status.body}');
+    }
+    final exitCode =
+        (jsonDecode(status.body) as Map<String, dynamic>)['ExitCode'];
+    if (exitCode != 0) {
+      throw StateError(
+        'Command failed (exit $exitCode): ${buffer.toString().trim()}',
+      );
     }
     return buffer.toString();
   }
 
   /// List files in a path inside container or mounted volume via exec
-  Future<List<Map<String, String>>> listContainerFiles(String containerId, String path) async {
-    final raw = await execCommand(containerId, 'ls -la "$path" 2>/dev/null || ls -la "$path"');
-    final lines = raw.split('\n');
-    final List<Map<String, String>> files = [];
-
-    for (final line in lines) {
-      final trimmed = line.replaceAll('\r', '').trim();
-      if (trimmed.isEmpty || trimmed.startsWith('total')) continue;
-      final parts = trimmed.split(RegExp(r'\s+'));
-      if (parts.length >= 9) {
-        final permissions = parts[0];
-        final isDir = permissions.startsWith('d');
-        final size = parts[4];
-        String fullPathName = parts.sublist(8).join(' ');
-        if (fullPathName.contains(' -> ')) {
-          fullPathName = fullPathName.split(' -> ').first;
-        }
-        final name = fullPathName.trim();
-        if (name == '.' || name == '..') continue;
-        files.add({
-          'name': name,
-          'permissions': permissions,
-          'size': size,
-          'isDir': isDir ? 'true' : 'false',
-        });
-      }
+  Future<List<Map<String, String>>> listContainerFiles(
+    String containerId,
+    String path,
+  ) async {
+    final command =
+        'directory=${shellQuote(path)}\n'
+        r'''
+if [ ! -d "$directory" ] || [ ! -r "$directory" ] || [ ! -x "$directory" ]; then
+  printf '%s\n' 'Directory is not accessible.' >&2
+  exit 1
+fi
+for entry in "$directory"/* "$directory"/.[!.]* "$directory"/..?*; do
+  [ -e "$entry" ] || [ -L "$entry" ] || continue
+  metadata=$(stat -c '%A %s' -- "$entry") || exit 1
+  directoryEntry=false
+  if [ -d "$entry" ]; then directoryEntry=true; fi
+  printf '%s\000%s\000%s\000%s\000' "${entry##*/}" "${metadata% *}" "${metadata##* }" "$directoryEntry"
+done
+''';
+    final raw = await execCommand(containerId, command);
+    if (raw.isEmpty) return [];
+    final fields = raw.split('\u0000');
+    if (fields.last.isNotEmpty || (fields.length - 1) % 4 != 0) {
+      throw const FormatException('Malformed directory listing');
     }
-    return files;
+    return [
+      for (var i = 0; i < fields.length - 1; i += 4)
+        {
+          'name': fields[i],
+          'permissions': fields[i + 1],
+          'size': fields[i + 2],
+          'isDir': fields[i + 3],
+        },
+    ];
   }
 
   /// Stream container stats (CPU %, memory usage)
@@ -262,32 +324,18 @@ class DockerApiClient {
     final path = '/containers/$id/stats?stream=true';
     final stream = _socket.streamResponse(method: 'GET', path: path);
 
-    final lineBuffer = StringBuffer();
+    yield* _jsonLines(stream);
+  }
 
-    await for (final chunk in stream) {
-      final chunkText = utf8.decode(chunk, allowMalformed: true);
-      lineBuffer.write(chunkText);
-
-      final content = lineBuffer.toString();
-      final lines = content.split('\n');
-
-      // Keep last incomplete segment in buffer
-      lineBuffer.clear();
-      lineBuffer.write(lines.last);
-
-      for (int i = 0; i < lines.length - 1; i++) {
-        final line = lines[i].trim();
-        if (line.isNotEmpty) {
-          try {
-            final parsed = jsonDecode(line);
-            if (parsed is Map<String, dynamic>) {
-              yield parsed;
-            }
-          } catch (_) {
-            // Ignore malformed chunk boundary lines
-          }
-        }
+  Stream<Map<String, dynamic>> _jsonLines(Stream<List<int>> stream) async* {
+    await for (final line
+        in utf8.decoder.bind(stream).transform(const LineSplitter())) {
+      if (line.trim().isEmpty) continue;
+      final value = jsonDecode(line);
+      if (value is! Map<String, dynamic>) {
+        throw const FormatException('Expected a Docker JSON object');
       }
+      yield value;
     }
   }
 
@@ -295,50 +343,28 @@ class DockerApiClient {
 
   /// List Docker images
   Future<List<ImageModel>> getImages({bool showAll = true}) async {
-    final res = await _socket.request(method: 'GET', path: '/images/json?all=${showAll ? 1 : 0}');
+    final res = await _socket.request(
+      method: 'GET',
+      path: '/images/json?all=${showAll ? 1 : 0}',
+    );
     if (!res.isSuccess) {
       throw Exception('Failed to list images: ${res.body}');
     }
     final List<dynamic> decoded = jsonDecode(res.body);
-    return decoded.map((item) => ImageModel.fromJson(item as Map<String, dynamic>)).toList();
+    return decoded
+        .map((item) => ImageModel.fromJson(item as Map<String, dynamic>))
+        .toList();
   }
 
   /// Pull image with streaming progress updates
   Stream<Map<String, dynamic>> pullImage(String imageName) async* {
-    String fromImage = imageName;
-    String tag = 'latest';
-    if (imageName.contains(':')) {
-      final parts = imageName.split(':');
-      fromImage = parts[0];
-      tag = parts[1];
-    }
-
-    final path = '/images/create?fromImage=${Uri.encodeComponent(fromImage)}&tag=${Uri.encodeComponent(tag)}';
+    final reference = imageName.trim();
+    final path = '/images/create?fromImage=${Uri.encodeComponent(reference)}';
     final stream = _socket.streamResponse(method: 'POST', path: path);
 
-    final lineBuffer = StringBuffer();
-
-    await for (final chunk in stream) {
-      final text = utf8.decode(chunk, allowMalformed: true);
-      lineBuffer.write(text);
-
-      final content = lineBuffer.toString();
-      final lines = content.split('\n');
-
-      lineBuffer.clear();
-      lineBuffer.write(lines.last);
-
-      for (int i = 0; i < lines.length - 1; i++) {
-        final line = lines[i].trim();
-        if (line.isNotEmpty) {
-          try {
-            final obj = jsonDecode(line);
-            if (obj is Map<String, dynamic>) {
-              yield obj;
-            }
-          } catch (_) {}
-        }
-      }
+    await for (final object in _jsonLines(stream)) {
+      if (object['error'] != null) throw StateError(object['error'].toString());
+      yield object;
     }
   }
 
@@ -372,16 +398,22 @@ class DockerApiClient {
     }
     final map = jsonDecode(res.body) as Map<String, dynamic>;
     final list = (map['Volumes'] as List<dynamic>?) ?? [];
-    return list.map((item) => VolumeModel.fromJson(item as Map<String, dynamic>)).toList();
+    return list
+        .map((item) => VolumeModel.fromJson(item as Map<String, dynamic>))
+        .toList();
   }
 
   /// Create a volume
-  Future<VolumeModel> createVolume(String name, {String driver = 'local'}) async {
-    final body = jsonEncode({
-      'Name': name,
-      'Driver': driver,
-    });
-    final res = await _socket.request(method: 'POST', path: '/volumes/create', body: body);
+  Future<VolumeModel> createVolume(
+    String name, {
+    String driver = 'local',
+  }) async {
+    final body = jsonEncode({'Name': name, 'Driver': driver});
+    final res = await _socket.request(
+      method: 'POST',
+      path: '/volumes/create',
+      body: body,
+    );
     if (!res.isSuccess) {
       throw Exception('Failed to create volume: ${res.body}');
     }
@@ -417,17 +449,26 @@ class DockerApiClient {
       throw Exception('Failed to list networks: ${res.body}');
     }
     final List<dynamic> decoded = jsonDecode(res.body);
-    return decoded.map((item) => NetworkModel.fromJson(item as Map<String, dynamic>)).toList();
+    return decoded
+        .map((item) => NetworkModel.fromJson(item as Map<String, dynamic>))
+        .toList();
   }
 
   /// Create network
-  Future<NetworkModel> createNetwork(String name, {String driver = 'bridge'}) async {
+  Future<NetworkModel> createNetwork(
+    String name, {
+    String driver = 'bridge',
+  }) async {
     final body = jsonEncode({
       'Name': name,
       'Driver': driver,
       'CheckDuplicate': true,
     });
-    final res = await _socket.request(method: 'POST', path: '/networks/create', body: body);
+    final res = await _socket.request(
+      method: 'POST',
+      path: '/networks/create',
+      body: body,
+    );
     if (!res.isSuccess) {
       throw Exception('Failed to create network: ${res.body}');
     }
@@ -463,59 +504,29 @@ class DockerApiClient {
     return jsonDecode(res.body) as Map<String, dynamic>;
   }
 
-  /// System Prune All (`docker system prune -a --volumes`)
+  /// Remove stopped containers, dangling images, unused anonymous volumes and networks.
   Future<Map<String, dynamic>> systemPruneAll() async {
-    final containersRes = await _socket.request(method: 'POST', path: '/containers/prune');
-    final imagesRes = await _socket.request(method: 'POST', path: '/images/prune?all=1');
-    final volumesRes = await _socket.request(method: 'POST', path: '/volumes/prune');
-    final networksRes = await _socket.request(method: 'POST', path: '/networks/prune');
-
-    return {
-      'containers': containersRes.isSuccess ? jsonDecode(containersRes.body) : {},
-      'images': imagesRes.isSuccess ? jsonDecode(imagesRes.body) : {},
-      'volumes': volumesRes.isSuccess ? jsonDecode(volumesRes.body) : {},
-      'networks': networksRes.isSuccess ? jsonDecode(networksRes.body) : {},
-    };
+    final results = <String, dynamic>{};
+    for (final resource in ['containers', 'images', 'volumes', 'networks']) {
+      final response = await _socket.request(
+        method: 'POST',
+        path: '/$resource/prune',
+      );
+      if (!response.isSuccess) {
+        throw Exception(
+          'Pruning $resource failed: ${response.body}. Earlier prune steps may have completed.',
+        );
+      }
+      results[resource] = jsonDecode(response.body);
+    }
+    return results;
   }
 
   /// Real-time event stream (`/events`)
   Stream<DockerEventModel> streamEvents() async* {
     final stream = _socket.streamResponse(method: 'GET', path: '/events');
-    final lineBuffer = StringBuffer();
-
-    await for (final chunk in stream) {
-      final text = utf8.decode(chunk, allowMalformed: true);
-      lineBuffer.write(text);
-
-      final content = lineBuffer.toString();
-      final lines = content.split('\n');
-
-      lineBuffer.clear();
-      lineBuffer.write(lines.last);
-
-      for (int i = 0; i < lines.length - 1; i++) {
-        String line = lines[i].trim();
-        if (line.isEmpty) continue;
-
-        // Clean HTTP Chunked encoding hex prefixes (e.g. "1a4\r\n{...}")
-        final jsonStart = line.indexOf('{');
-        if (jsonStart != -1) {
-          line = line.substring(jsonStart);
-        }
-        final jsonEnd = line.lastIndexOf('}');
-        if (jsonEnd != -1 && jsonEnd >= jsonStart) {
-          line = line.substring(0, jsonEnd + 1);
-        }
-
-        if (line.startsWith('{') && line.endsWith('}')) {
-          try {
-            final obj = jsonDecode(line);
-            if (obj is Map<String, dynamic>) {
-              yield DockerEventModel.fromJson(obj);
-            }
-          } catch (_) {}
-        }
-      }
+    await for (final object in _jsonLines(stream)) {
+      yield DockerEventModel.fromJson(object);
     }
   }
 }

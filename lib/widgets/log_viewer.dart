@@ -28,7 +28,7 @@ class _LogViewerState extends State<LogViewer> {
   @override
   void didUpdateWidget(covariant LogViewer oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (_autoScroll && widget.logs.length != oldWidget.logs.length) {
+    if (_autoScroll) {
       _scrollToBottom();
     }
   }
@@ -49,11 +49,15 @@ class _LogViewerState extends State<LogViewer> {
   Widget build(BuildContext context) {
     final filteredLogs = _filter.isEmpty
         ? widget.logs
-        : widget.logs.where((l) => l.toLowerCase().contains(_filter.toLowerCase())).toList();
+        : widget.logs
+              .where((l) => l.toLowerCase().contains(_filter.toLowerCase()))
+              .toList();
 
     final isDark = AppColors.isDark(context);
     final termBg = isDark ? const Color(0xFF0C0E11) : const Color(0xFF0F172A);
-    final toolbarBg = isDark ? const Color(0xFF1A1C1F) : const Color(0xFF1E293B);
+    final toolbarBg = isDark
+        ? const Color(0xFF1A1C1F)
+        : const Color(0xFF1E293B);
     final borderColor = AppColors.borderColor(context);
 
     return Container(
@@ -75,7 +79,10 @@ class _LogViewerState extends State<LogViewer> {
                 topRight: Radius.circular(12),
               ),
             ),
-            child: Row(
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 const Icon(
                   Icons.terminal_rounded,
@@ -95,7 +102,10 @@ class _LogViewerState extends State<LogViewer> {
                 const SizedBox(width: 12),
                 if (widget.isStreaming)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.success.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(4),
@@ -123,7 +133,6 @@ class _LogViewerState extends State<LogViewer> {
                       ],
                     ),
                   ),
-                const Spacer(),
                 // Filter search
                 SizedBox(
                   width: 180,
@@ -136,7 +145,10 @@ class _LogViewerState extends State<LogViewer> {
                     ),
                     decoration: InputDecoration(
                       hintText: 'Filter logs...',
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       fillColor: termBg,
                       hintStyle: GoogleFonts.jetBrainsMono(
                         fontSize: 12,
@@ -154,21 +166,35 @@ class _LogViewerState extends State<LogViewer> {
                   icon: Icon(
                     _autoScroll ? Icons.arrow_downward : Icons.pause,
                     size: 16,
-                    color: _autoScroll ? const Color(0xFF38BDF8) : const Color(0xFF94A3B8),
+                    color: _autoScroll
+                        ? const Color(0xFF38BDF8)
+                        : const Color(0xFF94A3B8),
                   ),
-                  tooltip: _autoScroll ? 'Auto-scroll On' : 'Auto-scroll Paused',
+                  tooltip: _autoScroll
+                      ? 'Auto-scroll On'
+                      : 'Auto-scroll Paused',
                   onPressed: () => setState(() => _autoScroll = !_autoScroll),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.copy, size: 16, color: Color(0xFF94A3B8)),
+                  icon: const Icon(
+                    Icons.copy,
+                    size: 16,
+                    color: Color(0xFF94A3B8),
+                  ),
                   tooltip: 'Copy Logs',
                   onPressed: () {
-                    Clipboard.setData(ClipboardData(text: widget.logs.join('\n')));
+                    Clipboard.setData(
+                      ClipboardData(text: widget.logs.join('\n')),
+                    );
                   },
                 ),
                 if (widget.onClear != null)
                   IconButton(
-                    icon: const Icon(Icons.delete_sweep, size: 16, color: Color(0xFF94A3B8)),
+                    icon: const Icon(
+                      Icons.delete_sweep,
+                      size: 16,
+                      color: Color(0xFF94A3B8),
+                    ),
                     tooltip: 'Clear View',
                     onPressed: widget.onClear,
                   ),
@@ -192,11 +218,13 @@ class _LogViewerState extends State<LogViewer> {
                       style: GoogleFonts.jetBrainsMono(
                         fontSize: 12,
                         height: 1.4,
-                        color: line.toLowerCase().contains('err') || line.toLowerCase().contains('fail')
+                        color:
+                            line.toLowerCase().contains('err') ||
+                                line.toLowerCase().contains('fail')
                             ? const Color(0xFFF87171)
                             : line.toLowerCase().contains('warn')
-                                ? const Color(0xFFFBBF24)
-                                : const Color(0xFFE2E8F0),
+                            ? const Color(0xFFFBBF24)
+                            : const Color(0xFFE2E8F0),
                       ),
                     ),
                   );

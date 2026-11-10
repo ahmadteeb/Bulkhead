@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 import '../core/compose_cli_client.dart';
 import '../models/compose_stack_model.dart';
 import 'connection_status_provider.dart';
+import 'settings_provider.dart';
 
 class ComposeState {
   final List<ComposeStackModel> stacks;
@@ -34,20 +35,35 @@ class ComposeState {
 }
 
 final composeCliClientProvider = Provider<ComposeCliClient>((ref) {
-  return ComposeCliClient();
+  return ComposeCliClient(socketPath: ref.watch(socketPathProvider));
 });
+
+final composeAvailableProfilesProvider =
+    FutureProvider.family<List<String>, String>((ref, configFiles) {
+      return ref.watch(composeCliClientProvider).getStackProfiles(configFiles);
+    });
+
+// Choices survive resource refreshes and temporary daemon disconnects.
+final composeSelectedProfilesProvider =
+    StateProvider.family<Set<String>, String>((ref, configFiles) => {});
 
 class ComposeStacksNotifier extends StateNotifier<ComposeState> {
   final ComposeCliClient _cli;
   final bool _isConnected;
+  final Ref _ref;
+  int _refreshGeneration = 0;
   final Set<String> _trackedFilePaths = {};
 
-  ComposeStacksNotifier(this._cli, this._isConnected)
-      : super(ComposeState(stacks: [], isLoading: true)) {
+  ComposeStacksNotifier(this._cli, this._isConnected, this._ref)
+    : super(ComposeState(stacks: [], isLoading: true)) {
     if (_isConnected) {
       _init();
     } else {
-      state = ComposeState(stacks: [], isLoading: false, error: 'Docker daemon disconnected');
+      state = ComposeState(
+        stacks: [],
+        isLoading: false,
+        error: 'Docker daemon disconnected',
+      );
     }
   }
 
@@ -69,12 +85,13 @@ class ComposeStacksNotifier extends StateNotifier<ComposeState> {
 
   Future<void> refreshStacks({bool silent = false}) async {
     if (!mounted) return;
+    final generation = ++_refreshGeneration;
     if (!silent) {
       state = state.copyWith(isLoading: true, error: null);
     }
     try {
       final activeList = await _cli.listStacks();
-      if (!mounted) return;
+      if (!mounted || generation != _refreshGeneration) return;
 
       // Track active stack paths
       for (final s in activeList) {
@@ -89,28 +106,40 @@ class ComposeStacksNotifier extends StateNotifier<ComposeState> {
       for (final filePath in _trackedFilePaths) {
         final existsInActive = combined.any((s) => s.configFiles == filePath);
         if (!existsInActive) {
-          final dirName = p.basename(p.dirname(filePath));
-          final stackName = dirName.isEmpty ? p.basenameWithoutExtension(filePath) : dirName;
+          final dirName = p.basename(
+            p.dirname(parseComposePaths(filePath).first),
+          );
+          final stackName = dirName.isEmpty
+              ? p.basenameWithoutExtension(parseComposePaths(filePath).first)
+              : dirName;
 
-          combined.add(ComposeStackModel(
-            name: stackName,
-            status: 'stopped',
-            configFiles: filePath,
-          ));
+          combined.add(
+            ComposeStackModel(
+              name: stackName,
+              status: 'stopped',
+              configFiles: filePath,
+            ),
+          );
         }
       }
 
       state = state.copyWith(stacks: combined, isLoading: false, error: null);
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || generation != _refreshGeneration) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
+  List<String> _profilesFor(String files) =>
+      _ref.read(composeSelectedProfilesProvider(files)).toList()..sort();
+
   Future<void> stackUp(String composeFilePath) async {
     try {
       _trackedFilePaths.add(composeFilePath);
-      await _cli.stackUp(composeFilePath);
+      await _cli.stackUp(
+        composeFilePath,
+        profiles: _profilesFor(composeFilePath),
+      );
       if (mounted) {
         await refreshStacks(silent: true);
       }
@@ -125,7 +154,10 @@ class ComposeStacksNotifier extends StateNotifier<ComposeState> {
   Future<void> stackDown(String composeFilePath) async {
     try {
       _trackedFilePaths.add(composeFilePath);
-      await _cli.stackDown(composeFilePath);
+      await _cli.stackDown(
+        composeFilePath,
+        profiles: _profilesFor(composeFilePath),
+      );
       if (mounted) {
         await refreshStacks(silent: true);
       }
@@ -140,7 +172,10 @@ class ComposeStacksNotifier extends StateNotifier<ComposeState> {
   Future<void> stackRestart(String composeFilePath) async {
     try {
       _trackedFilePaths.add(composeFilePath);
-      await _cli.stackRestart(composeFilePath);
+      await _cli.stackRestart(
+        composeFilePath,
+        profiles: _profilesFor(composeFilePath),
+      );
       if (mounted) {
         await refreshStacks(silent: true);
       }
@@ -152,9 +187,16 @@ class ComposeStacksNotifier extends StateNotifier<ComposeState> {
     }
   }
 
-  Future<void> removeStack(String composeFilePath, {bool removeVolumes = true}) async {
+  Future<void> removeStack(
+    String composeFilePath, {
+    bool removeVolumes = true,
+  }) async {
     try {
-      await _cli.removeStack(composeFilePath, removeVolumes: removeVolumes);
+      await _cli.removeStack(
+        composeFilePath,
+        removeVolumes: removeVolumes,
+        profiles: _profilesFor(composeFilePath),
+      );
       _trackedFilePaths.remove(composeFilePath);
       if (mounted) {
         await refreshStacks(silent: true);
@@ -167,11 +209,25 @@ class ComposeStacksNotifier extends StateNotifier<ComposeState> {
     }
   }
 
-  Future<String> createStack(String dirPath, String filename, String yamlContent, {bool startNow = true}) async {
+  Future<String> createStack(
+    String dirPath,
+    String filename,
+    String yamlContent, {
+    bool startNow = true,
+    List<String> profiles = const [],
+  }) async {
     try {
-      final path = await _cli.createStack(dirPath, filename, yamlContent, startNow: startNow);
+      final path = await _cli.createStack(
+        dirPath,
+        filename,
+        yamlContent,
+        startNow: startNow,
+        profiles: profiles,
+      );
       _trackedFilePaths.add(path);
       if (mounted) {
+        _ref.read(composeSelectedProfilesProvider(path).notifier).state =
+            profiles.toSet();
         await refreshStacks(silent: true);
       }
       return path;
@@ -186,7 +242,7 @@ class ComposeStacksNotifier extends StateNotifier<ComposeState> {
 
 final composeStacksNotifierProvider =
     StateNotifierProvider<ComposeStacksNotifier, ComposeState>((ref) {
-  final cli = ref.watch(composeCliClientProvider);
-  final connState = ref.watch(connectionStatusProvider);
-  return ComposeStacksNotifier(cli, connState.isConnected);
-});
+      final cli = ref.watch(composeCliClientProvider);
+      final connState = ref.watch(connectionStatusProvider);
+      return ComposeStacksNotifier(cli, connState.isConnected, ref);
+    });

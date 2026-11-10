@@ -1,3 +1,4 @@
+import '../../widgets/message_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +10,7 @@ import '../../providers/connection_status_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/update_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../theme/design_tokens.dart';
 import '../../widgets/update_dialog.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -47,7 +49,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         : const Color(0xFF0F172A);
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(DesignTokens.pagePadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -88,7 +90,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Default Linux Unix Socket path is /var/run/docker.sock',
+                  'Use a local Unix socket or an explicit tcp:// Docker endpoint.',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 16),
@@ -107,8 +109,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     const SizedBox(width: 12),
                     ElevatedButton(
                       onPressed: () {
-                        ref.read(socketPathProvider.notifier).state =
-                            _socketController.text.trim();
+                        final endpoint = _socketController.text.trim();
+                        if (endpoint.isEmpty) {
+                          showMessageDialog(
+                            context,
+                            title: 'Invalid connection',
+                            message: 'Enter a Docker socket path or endpoint.',
+                            type: MessageType.error,
+                          );
+                          return;
+                        }
+                        ref.read(socketPathProvider.notifier).state = endpoint;
                         ref
                             .read(connectionStatusProvider.notifier)
                             .checkConnection();
@@ -185,10 +196,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   'sudo usermod -aG docker \$USER && newgrp docker',
                             ),
                           );
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Command copied to clipboard'),
-                            ),
+                          showMessageDialog(
+                            context,
+                            title: 'Information',
+                            message: 'Command copied to clipboard',
+                            type: MessageType.info,
                           );
                         },
                       ),
@@ -228,17 +240,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   segments: const [
                     ButtonSegment(
                       value: ThemeMode.light,
-                      label: Text('Light Mode'),
+                      label: Text('Light'),
                       icon: Icon(Icons.light_mode_outlined),
                     ),
                     ButtonSegment(
                       value: ThemeMode.dark,
-                      label: Text('Dark Mode'),
+                      label: Text('Dark'),
                       icon: Icon(Icons.dark_mode_outlined),
                     ),
                     ButtonSegment(
                       value: ThemeMode.system,
-                      label: Text('System Default'),
+                      label: Text('System'),
                       icon: Icon(Icons.settings_suggest_outlined),
                     ),
                   ],
@@ -272,14 +284,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     Text(
                       'Software Updates & Version',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Wrap(
+                  spacing: 24,
+                  runSpacing: 16,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -302,7 +316,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryColor,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -310,21 +327,38 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       icon: const Icon(Icons.refresh_rounded, size: 16),
                       label: const Text('Check for Updates'),
                       onPressed: () async {
-                        final messenger = ScaffoldMessenger.of(context);
-                        final notifier = ref.read(updateCheckNotifierProvider.notifier);
-                        await notifier.checkForUpdates(forceUserCheck: true);
-                        if (!mounted) return;
-                        final updateState = ref.read(updateCheckNotifierProvider);
-                        final updateInfo = updateState.value;
+                        final notifier = ref.read(
+                          updateCheckNotifierProvider.notifier,
+                        );
+                        await withProgressDialog(
+                          context,
+                          'Checking for updates',
+                          () => notifier.checkForUpdates(forceUserCheck: true),
+                        );
+                        if (!context.mounted) return;
+                        final updateState = ref.read(
+                          updateCheckNotifierProvider,
+                        );
+                        if (updateState.hasError) {
+                          showMessageDialog(
+                            context,
+                            title: 'Operation failed',
+                            message:
+                                'Unable to check for updates: ${updateState.error}',
+                            type: MessageType.error,
+                          );
+                          return;
+                        }
+                        final updateInfo = updateState.valueOrNull;
                         if (updateInfo != null) {
                           if (updateInfo.hasUpdate) {
                             _showUpdateDialog(updateInfo);
                           } else {
-                            messenger.showSnackBar(
-                              const SnackBar(
-                                content: Text('Bulkhead is up to date! 🎉'),
-                                backgroundColor: AppColors.success,
-                              ),
+                            showMessageDialog(
+                              context,
+                              title: 'Completed',
+                              message: 'Bulkhead is up to date! 🎉',
+                              type: MessageType.success,
                             );
                           }
                         }

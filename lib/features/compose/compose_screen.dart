@@ -1,3 +1,4 @@
+import '../../widgets/message_dialog.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,10 +8,14 @@ import 'package:path/path.dart' as p;
 import '../../models/compose_stack_model.dart';
 import '../../providers/compose_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../theme/design_tokens.dart';
 import '../../widgets/confirm_dialog.dart';
+import '../../widgets/resource_action.dart';
 import '../../widgets/data_table_shell.dart';
+import '../../widgets/page_header.dart';
 import '../../widgets/log_viewer.dart';
 import '../../widgets/status_badge.dart';
+import '../../widgets/compose_profiles_control.dart';
 
 class ComposeScreen extends ConsumerStatefulWidget {
   const ComposeScreen({super.key});
@@ -45,8 +50,11 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
 
   void _showNewStackDialog(BuildContext context) {
     final nameController = TextEditingController(text: 'my-service-stack');
-    final dirController = TextEditingController(text: '/home/ahmadteeb/compose_stacks/my-service-stack');
-    final yamlController = TextEditingController(text: '''version: '3.8'
+    final dirController = TextEditingController(
+      text: '/home/ahmadteeb/compose_stacks/my-service-stack',
+    );
+    final yamlController = TextEditingController(
+      text: '''version: '3.8'
 
 services:
   web:
@@ -54,7 +62,9 @@ services:
     ports:
       - "8080:80"
     restart: always
-''');
+''',
+    );
+    final profilesController = TextEditingController();
     bool startNow = true;
 
     showDialog(
@@ -79,7 +89,8 @@ services:
                     onChanged: (val) {
                       final name = val.trim();
                       if (name.isNotEmpty) {
-                        dirController.text = '/home/ahmadteeb/compose_stacks/$name';
+                        dirController.text =
+                            '/home/ahmadteeb/compose_stacks/$name';
                       }
                     },
                   ),
@@ -112,7 +123,10 @@ services:
                     child: TextField(
                       controller: yamlController,
                       maxLines: null,
-                      style: GoogleFonts.jetBrainsMono(fontSize: 12, color: Colors.white),
+                      style: GoogleFonts.jetBrainsMono(
+                        fontSize: 12,
+                        color: Colors.white,
+                      ),
                       decoration: const InputDecoration(
                         border: InputBorder.none,
                         enabledBorder: InputBorder.none,
@@ -120,14 +134,27 @@ services:
                       ),
                     ),
                   ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: profilesController,
+                    decoration: const InputDecoration(
+                      labelText: 'Profiles (optional)',
+                      hintText: 'e.g. dev, tools',
+                      helperText:
+                          'Comma-separated profiles to enable for deployment.',
+                    ),
+                  ),
                   const SizedBox(height: 10),
                   Row(
                     children: [
                       Checkbox(
                         value: startNow,
-                        onChanged: (val) => setStateDialog(() => startNow = val ?? true),
+                        onChanged: (val) =>
+                            setStateDialog(() => startNow = val ?? true),
                       ),
-                      const Text('Start containers immediately (docker compose up -d)'),
+                      const Text(
+                        'Start containers immediately (docker compose up -d)',
+                      ),
                     ],
                   ),
                 ],
@@ -147,12 +174,26 @@ services:
                   try {
                     await ref
                         .read(composeStacksNotifierProvider.notifier)
-                        .createStack(dirPath, 'docker-compose.yml', yamlContent, startNow: startNow);
+                        .createStack(
+                          dirPath,
+                          'docker-compose.yml',
+                          yamlContent,
+                          startNow: startNow,
+                          profiles: profilesController.text
+                              .split(',')
+                              .map((profile) => profile.trim())
+                              .where((profile) => profile.isNotEmpty)
+                              .toSet()
+                              .toList(),
+                        );
                     if (ctx.mounted) Navigator.of(ctx).pop();
                   } catch (e) {
                     if (ctx.mounted) {
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        SnackBar(content: Text('Deploy Failed: $e'), backgroundColor: AppColors.error),
+                      showMessageDialog(
+                        ctx,
+                        title: 'Operation failed',
+                        message: 'Deploy Failed: $e',
+                        type: MessageType.error,
                       );
                     }
                   }
@@ -160,14 +201,21 @@ services:
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
+                foregroundColor: Theme.of(
+                  context,
+                ).colorScheme.onPrimaryContainer,
               ),
               child: const Text('Deploy Stack'),
             ),
           ],
         ),
       ),
-    );
+    ).whenComplete(() {
+      nameController.dispose();
+      dirController.dispose();
+      yamlController.dispose();
+      profilesController.dispose();
+    });
   }
 
   @override
@@ -175,69 +223,70 @@ services:
     final composeState = ref.watch(composeStacksNotifierProvider);
 
     final onSurfaceColor = Theme.of(context).colorScheme.onSurface;
-    final primaryContainerColor = Theme.of(context).colorScheme.primaryContainer;
-    final onPrimaryContainerColor = Theme.of(context).colorScheme.onPrimaryContainer;
+    final primaryContainerColor = Theme.of(
+      context,
+    ).colorScheme.primaryContainer;
+    final onPrimaryContainerColor = Theme.of(
+      context,
+    ).colorScheme.onPrimaryContainer;
     final mutedTextColor = Theme.of(context).textTheme.bodySmall?.color;
 
-    final isAllSelected = composeState.stacks.isNotEmpty &&
-        composeState.stacks.every((s) => _selectedPaths.contains(s.configFiles));
-    final isSomeSelected = composeState.stacks.any((s) => _selectedPaths.contains(s.configFiles));
-    final selectAllValue = isAllSelected ? true : (isSomeSelected ? null : false);
+    final isAllSelected =
+        composeState.stacks.isNotEmpty &&
+        composeState.stacks.every(
+          (s) => _selectedPaths.contains(s.configFiles),
+        );
+    final isSomeSelected = composeState.stacks.any(
+      (s) => _selectedPaths.contains(s.configFiles),
+    );
+    final selectAllValue = isAllSelected
+        ? true
+        : (isSomeSelected ? null : false);
 
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(DesignTokens.pagePadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header Bar
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isNarrow = constraints.maxWidth < 700;
-
-              final titleSection = Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Docker Compose Stacks',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Multi-container application stacks managed via docker compose CLI',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              );
-
-              final actionButtons = ElevatedButton.icon(
-                onPressed: () => _showNewStackDialog(context),
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Deploy Stack'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryContainerColor,
-                  foregroundColor: onPrimaryContainerColor,
-                  elevation: 0,
+          PageHeader(
+            title: 'Docker Compose Stacks',
+            subtitle:
+                'Manage services and deploy multi-container applications.',
+            actions: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: composeState.isLoading
+                      ? null
+                      : () {
+                          for (final stack in composeState.stacks) {
+                            ref.invalidate(
+                              composeAvailableProfilesProvider(
+                                stack.configFiles,
+                              ),
+                            );
+                          }
+                          ref
+                              .read(composeStacksNotifierProvider.notifier)
+                              .refreshStacks();
+                        },
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: const Text('Refresh'),
                 ),
-              );
-
-              if (isNarrow) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    titleSection,
-                    const SizedBox(height: 12),
-                    actionButtons,
-                  ],
-                );
-              }
-
-              return Row(
-                children: [
-                  Expanded(child: titleSection),
-                  actionButtons,
-                ],
-              );
-            },
+                ElevatedButton.icon(
+                  onPressed: () => _showNewStackDialog(context),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Deploy Stack'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryContainerColor,
+                    foregroundColor: onPrimaryContainerColor,
+                    elevation: 0,
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 20),
 
@@ -249,15 +298,22 @@ services:
               decoration: BoxDecoration(
                 color: AppColors.error.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                border: Border.all(
+                  color: AppColors.error.withValues(alpha: 0.3),
+                ),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 24),
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    color: AppColors.error,
+                    size: 24,
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      composeState.error ?? 'Docker Compose CLI binary not found on system PATH.',
+                      composeState.error ??
+                          'Docker Compose CLI binary not found on system PATH.',
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ),
@@ -273,21 +329,38 @@ services:
                     onBack: () => setState(() => _selectedStack = null),
                   )
                 : DataTableShell(
+                    errorMessage: composeState.error,
+                    onRetry: () => ref
+                        .read(composeStacksNotifierProvider.notifier)
+                        .refreshStacks(),
                     title: 'Active Compose Stacks',
                     subtitle: _selectedPaths.isEmpty
                         ? '${composeState.stacks.length} projects detected'
                         : '${_selectedPaths.length} stack(s) selected',
                     showSelectAll: true,
                     selectAllValue: selectAllValue,
-                    onSelectAllChanged: (val) => _toggleSelectAll(composeState.stacks, val),
+                    onSelectAllChanged: (val) =>
+                        _toggleSelectAll(composeState.stacks, val),
                     bulkActions: _selectedPaths.isEmpty
                         ? null
                         : [
                             ElevatedButton.icon(
                               onPressed: () async {
                                 final paths = List<String>.from(_selectedPaths);
-                                for (final p in paths) {
-                                  await ref.read(composeStacksNotifierProvider.notifier).stackUp(p);
+                                if (!context.mounted) return;
+                                if (!await runBulkResourceAction(
+                                  context,
+                                  'Start stack',
+                                  paths,
+                                  (p) => ref
+                                      .read(
+                                        composeStacksNotifierProvider.notifier,
+                                      )
+                                      .stackUp(p),
+                                  onCompleted: (p) =>
+                                      setState(() => _selectedPaths.remove(p)),
+                                )) {
+                                  return;
                                 }
                               },
                               icon: const Icon(Icons.play_arrow, size: 16),
@@ -303,62 +376,116 @@ services:
                                 final confirm = await ConfirmDialog.show(
                                   context,
                                   title: 'Down Selected Stacks',
-                                  message: 'Bring down ${_selectedPaths.length} selected stacks?',
+                                  message:
+                                      'Bring down ${_selectedPaths.length} stacks using each stack’s selected profiles? Default services are included.',
                                   confirmLabel: 'Down All',
                                 );
                                 if (confirm == true) {
-                                  final paths = List<String>.from(_selectedPaths);
-                                  for (final p in paths) {
-                                    await ref.read(composeStacksNotifierProvider.notifier).stackDown(p);
+                                  final paths = List<String>.from(
+                                    _selectedPaths,
+                                  );
+                                  if (!context.mounted) return;
+                                  if (!await runBulkResourceAction(
+                                    context,
+                                    'Stop stack',
+                                    paths,
+                                    (p) => ref
+                                        .read(
+                                          composeStacksNotifierProvider
+                                              .notifier,
+                                        )
+                                        .stackDown(p),
+                                    onCompleted: (p) => setState(
+                                      () => _selectedPaths.remove(p),
+                                    ),
+                                  )) {
+                                    return;
                                   }
                                 }
                               },
                               icon: const Icon(Icons.pause, size: 16),
                               label: Text('Down (${_selectedPaths.length})'),
-                              style: OutlinedButton.styleFrom(foregroundColor: AppColors.warning),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.warning,
+                              ),
                             ),
                             const SizedBox(width: 8),
                             IconButton(
-                              icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.error),
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                size: 20,
+                                color: AppColors.error,
+                              ),
                               tooltip: 'Delete Selected Stacks',
                               onPressed: () async {
                                 final confirm = await ConfirmDialog.show(
                                   context,
                                   title: 'Purge Selected Stacks',
-                                  message: 'Permanently remove containers, networks, and volumes for ${_selectedPaths.length} selected stacks?',
+                                  message:
+                                      'Permanently remove containers, networks, and volumes for the selected profiles in ${_selectedPaths.length} stacks? Default services are included.',
                                   confirmLabel: 'Delete All',
                                   isDestructive: true,
                                 );
                                 if (confirm == true) {
-                                  final paths = List<String>.from(_selectedPaths);
-                                  for (final path in paths) {
-                                    await ref.read(composeStacksNotifierProvider.notifier).removeStack(path, removeVolumes: true);
+                                  final paths = List<String>.from(
+                                    _selectedPaths,
+                                  );
+                                  if (!context.mounted) return;
+                                  if (!await runBulkResourceAction(
+                                    context,
+                                    'Remove stack',
+                                    paths,
+                                    (path) => ref
+                                        .read(
+                                          composeStacksNotifierProvider
+                                              .notifier,
+                                        )
+                                        .removeStack(path, removeVolumes: true),
+                                    onCompleted: (path) => setState(
+                                      () => _selectedPaths.remove(path),
+                                    ),
+                                  )) {
+                                    return;
                                   }
-                                  setState(() => _selectedPaths.clear());
+                                  if (mounted) {
+                                    setState(() => _selectedPaths.clear());
+                                  }
                                 }
                               },
                             ),
                           ],
-                    isLoading: composeState.isLoading && composeState.stacks.isEmpty,
+                    isLoading:
+                        composeState.isLoading && composeState.stacks.isEmpty,
                     columns: const [
                       DataTableColumnSpec(title: 'Stack Name', width: 180),
                       DataTableColumnSpec(title: 'Status', width: 160),
-                      DataTableColumnSpec(title: 'Compose File & Path', flex: true),
+                      DataTableColumnSpec(
+                        title: 'Compose File & Path',
+                        flex: true,
+                      ),
                       DataTableColumnSpec(title: 'Actions', width: 240),
                     ],
                     itemCount: composeState.stacks.length,
                     rowBuilder: (context, index) {
                       final stack = composeState.stacks[index];
-                      final isSelected = _selectedPaths.contains(stack.configFiles);
+                      final isSelected = _selectedPaths.contains(
+                        stack.configFiles,
+                      );
 
                       final filePath = stack.configFiles;
-                      final fileName = p.basename(filePath);
-                      final dirPath = p.dirname(filePath);
+                      final primaryPath = stack.configPaths.firstOrNull ?? '';
+                      final fileName = stack.configPaths.length > 1
+                          ? '${p.basename(primaryPath)} + ${stack.configPaths.length - 1} more'
+                          : p.basename(primaryPath);
+                      final dirPath = p.dirname(primaryPath);
 
                       return InkWell(
                         onTap: () => setState(() => _selectedStack = stack),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
                           child: Row(
                             children: [
                               // Checkbox
@@ -366,7 +493,8 @@ services:
                                 width: 40,
                                 child: Checkbox(
                                   value: isSelected,
-                                  onChanged: (_) => _toggleSelect(stack.configFiles),
+                                  onChanged: (_) =>
+                                      _toggleSelect(stack.configFiles),
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -387,7 +515,7 @@ services:
 
                               // Status
                               SizedBox(
-                                width: 140,
+                                width: 160,
                                 child: StatusBadge.fromState(stack.status),
                               ),
 
@@ -397,7 +525,9 @@ services:
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      fileName.isEmpty ? 'docker-compose.yml' : fileName,
+                                      fileName.isEmpty
+                                          ? 'docker-compose.yml'
+                                          : fileName,
                                       style: GoogleFonts.jetBrainsMono(
                                         fontSize: 13,
                                         fontWeight: FontWeight.w600,
@@ -413,6 +543,9 @@ services:
                                         color: mutedTextColor,
                                       ),
                                     ),
+                                    ComposeProfilesControl(
+                                      configFiles: stack.configFiles,
+                                    ),
                                   ],
                                 ),
                               ),
@@ -423,70 +556,147 @@ services:
                                 child: Row(
                                   children: [
                                     IconButton(
-                                      icon: const Icon(Icons.play_circle_outline, size: 20, color: AppColors.success),
-                                      tooltip: 'Up Stack (docker compose up -d)',
+                                      icon: const Icon(
+                                        Icons.play_circle_outline,
+                                        size: 20,
+                                        color: AppColors.success,
+                                      ),
+                                      tooltip:
+                                          'Up Stack (docker compose up -d)',
                                       onPressed: stack.configFiles.isEmpty
                                           ? null
                                           : () async {
-                                              await ref
-                                                  .read(composeStacksNotifierProvider.notifier)
-                                                  .stackUp(stack.configFiles);
-                                            },
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.pause_circle_outline, size: 20, color: AppColors.warning),
-                                      tooltip: 'Down Stack (docker compose down)',
-                                      onPressed: stack.configFiles.isEmpty
-                                          ? null
-                                          : () async {
-                                              final confirm = await ConfirmDialog.show(
+                                              if (!context.mounted) return;
+                                              if (!await runResourceAction(
                                                 context,
-                                                title: 'Down Stack',
-                                                message: 'Bring down stack "${stack.name}"?',
-                                                confirmLabel: 'Down',
-                                              );
-                                              if (confirm == true) {
-                                                await ref
-                                                    .read(composeStacksNotifierProvider.notifier)
-                                                    .stackDown(stack.configFiles);
+                                                'Start stack: ${stack.configFiles}',
+                                                () => ref
+                                                    .read(
+                                                      composeStacksNotifierProvider
+                                                          .notifier,
+                                                    )
+                                                    .stackUp(stack.configFiles),
+                                              )) {
+                                                return;
                                               }
                                             },
                                     ),
                                     IconButton(
-                                      icon: Icon(Icons.restart_alt, size: 20, color: Theme.of(context).colorScheme.primary),
+                                      icon: const Icon(
+                                        Icons.pause_circle_outline,
+                                        size: 20,
+                                        color: AppColors.warning,
+                                      ),
+                                      tooltip:
+                                          'Down Stack (docker compose down)',
+                                      onPressed: stack.configFiles.isEmpty
+                                          ? null
+                                          : () async {
+                                              final confirm =
+                                                  await ConfirmDialog.show(
+                                                    context,
+                                                    title: 'Down Stack',
+                                                    message:
+                                                        'Bring down the selected profiles of "${stack.name}"? Default services are included.',
+                                                    confirmLabel: 'Down',
+                                                  );
+                                              if (confirm == true) {
+                                                if (!context.mounted) return;
+                                                if (!await runResourceAction(
+                                                  context,
+                                                  'Stop stack: ${stack.configFiles}',
+                                                  () => ref
+                                                      .read(
+                                                        composeStacksNotifierProvider
+                                                            .notifier,
+                                                      )
+                                                      .stackDown(
+                                                        stack.configFiles,
+                                                      ),
+                                                )) {
+                                                  return;
+                                                }
+                                              }
+                                            },
+                                    ),
+                                    IconButton(
+                                      icon: Icon(
+                                        Icons.restart_alt,
+                                        size: 20,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.primary,
+                                      ),
                                       tooltip: 'Restart Stack',
                                       onPressed: stack.configFiles.isEmpty
                                           ? null
                                           : () async {
-                                              await ref
-                                                  .read(composeStacksNotifierProvider.notifier)
-                                                  .stackRestart(stack.configFiles);
-                                            },
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.error),
-                                      tooltip: 'Purge / Delete Stack',
-                                      onPressed: stack.configFiles.isEmpty
-                                          ? null
-                                          : () async {
-                                              final confirm = await ConfirmDialog.show(
+                                              if (!context.mounted) return;
+                                              if (!await runResourceAction(
                                                 context,
-                                                title: 'Delete Stack',
-                                                message: 'Permanently remove all containers, networks, and volumes for "${stack.name}"?',
-                                                confirmLabel: 'Delete Stack',
-                                                isDestructive: true,
-                                              );
-                                              if (confirm == true) {
-                                                await ref
-                                                    .read(composeStacksNotifierProvider.notifier)
-                                                    .removeStack(stack.configFiles, removeVolumes: true);
+                                                'Restart stack: ${stack.configFiles}',
+                                                () => ref
+                                                    .read(
+                                                      composeStacksNotifierProvider
+                                                          .notifier,
+                                                    )
+                                                    .stackRestart(
+                                                      stack.configFiles,
+                                                    ),
+                                              )) {
+                                                return;
                                               }
                                             },
                                     ),
                                     IconButton(
-                                      icon: const Icon(Icons.edit_note, size: 20),
+                                      icon: const Icon(
+                                        Icons.delete_outline,
+                                        size: 20,
+                                        color: AppColors.error,
+                                      ),
+                                      tooltip: 'Purge / Delete Stack',
+                                      onPressed: stack.configFiles.isEmpty
+                                          ? null
+                                          : () async {
+                                              final confirm =
+                                                  await ConfirmDialog.show(
+                                                    context,
+                                                    title: 'Delete Stack',
+                                                    message:
+                                                        'Permanently remove containers, networks, and volumes for the selected profiles of "${stack.name}"? Default services are included.',
+                                                    confirmLabel:
+                                                        'Delete Stack',
+                                                    isDestructive: true,
+                                                  );
+                                              if (confirm == true) {
+                                                if (!context.mounted) return;
+                                                if (!await runResourceAction(
+                                                  context,
+                                                  'Remove stack: ${stack.configFiles}',
+                                                  () => ref
+                                                      .read(
+                                                        composeStacksNotifierProvider
+                                                            .notifier,
+                                                      )
+                                                      .removeStack(
+                                                        stack.configFiles,
+                                                        removeVolumes: true,
+                                                      ),
+                                                )) {
+                                                  return;
+                                                }
+                                              }
+                                            },
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.edit_note,
+                                        size: 20,
+                                      ),
                                       tooltip: 'View / Edit Stack YAML',
-                                      onPressed: () => setState(() => _selectedStack = stack),
+                                      onPressed: () => setState(
+                                        () => _selectedStack = stack,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -508,20 +718,23 @@ class _ComposeStackDetailView extends ConsumerStatefulWidget {
   final ComposeStackModel stack;
   final VoidCallback onBack;
 
-  const _ComposeStackDetailView({
-    required this.stack,
-    required this.onBack,
-  });
+  const _ComposeStackDetailView({required this.stack, required this.onBack});
 
   @override
-  ConsumerState<_ComposeStackDetailView> createState() => __ComposeStackDetailViewState();
+  ConsumerState<_ComposeStackDetailView> createState() =>
+      __ComposeStackDetailViewState();
 }
 
-class __ComposeStackDetailViewState extends ConsumerState<_ComposeStackDetailView> {
+class __ComposeStackDetailViewState
+    extends ConsumerState<_ComposeStackDetailView> {
   final TextEditingController _yamlController = TextEditingController();
   List<ComposeServiceInfo> _services = [];
   bool _loadingYaml = false;
   bool _savingYaml = false;
+  late String? _selectedFile;
+  String? _yamlError;
+  String _loadedYaml = '';
+  int _loadGeneration = 0;
   String? _selectedLogService;
   final List<String> _serviceLogs = [];
   StreamSubscription<String>? _logSub;
@@ -529,27 +742,77 @@ class __ComposeStackDetailViewState extends ConsumerState<_ComposeStackDetailVie
   @override
   void initState() {
     super.initState();
+    _selectedFile = widget.stack.configPaths.firstOrNull;
     _loadServicesAndYaml();
   }
 
   Future<void> _loadServicesAndYaml() async {
     final cli = ref.read(composeCliClientProvider);
-    if (widget.stack.configFiles.isNotEmpty) {
-      setState(() => _loadingYaml = true);
-      try {
-        final content = await cli.readComposeFile(widget.stack.configFiles);
-        final services = await cli.listStackServices(widget.stack.configFiles);
-        if (mounted) {
-          setState(() {
-            _yamlController.text = content;
-            _services = services;
-            _loadingYaml = false;
-          });
-        }
-      } catch (_) {
-        if (mounted) setState(() => _loadingYaml = false);
+    final generation = ++_loadGeneration;
+    setState(() {
+      _loadingYaml = true;
+      _yamlError = null;
+    });
+    try {
+      final services = await cli.listStackServices(widget.stack.configFiles);
+      if (mounted && generation == _loadGeneration) {
+        setState(() => _services = services);
+      }
+    } catch (error) {
+      if (mounted) showResourceError(context, 'Load stack services', error);
+    }
+    if (mounted && generation == _loadGeneration) await _loadYaml();
+  }
+
+  Future<void> _loadYaml() async {
+    final path = _selectedFile;
+    final generation = ++_loadGeneration;
+    setState(() {
+      _loadingYaml = true;
+      _yamlError = null;
+      _yamlController.clear();
+    });
+    try {
+      if (path == null) {
+        throw StateError('No Compose file was reported for this stack.');
+      }
+      final content = await ref
+          .read(composeCliClientProvider)
+          .readComposeFile(path);
+      if (mounted && generation == _loadGeneration) {
+        setState(() {
+          _yamlController.text = content;
+          _loadedYaml = content;
+        });
+      }
+    } catch (error) {
+      if (mounted && generation == _loadGeneration) {
+        setState(() => _yamlError = error.toString());
+      }
+    } finally {
+      if (mounted && generation == _loadGeneration) {
+        setState(() => _loadingYaml = false);
       }
     }
+  }
+
+  Future<void> _selectFile(String? path) async {
+    if (path == null || path == _selectedFile || _savingYaml) return;
+    if (_yamlController.text != _loadedYaml &&
+        !_loadingYaml &&
+        _yamlError == null) {
+      final discard = await ConfirmDialog.show(
+        context,
+        title: 'Switch Compose file?',
+        message:
+            'Save your edits before switching. Switching files discards changes in this editor.',
+        confirmLabel: 'Switch file',
+        isDestructive: false,
+      );
+      if (discard != true || !mounted) return;
+    }
+    setState(() => _selectedFile = path);
+    await _loadYaml();
   }
 
   void _listenServiceLogs(String serviceName) {
@@ -560,23 +823,37 @@ class __ComposeStackDetailViewState extends ConsumerState<_ComposeStackDetailVie
     });
 
     final cli = ref.read(composeCliClientProvider);
-    _logSub = cli.streamServiceLogs(widget.stack.configFiles, serviceName).listen((line) {
-      if (mounted) {
-        setState(() {
-          _serviceLogs.add(line);
-        });
-      }
-    });
+    _logSub = cli
+        .streamServiceLogs(widget.stack.configFiles, serviceName)
+        .listen(
+          (line) {
+            if (mounted) {
+              setState(() {
+                _serviceLogs.add(line);
+                if (_serviceLogs.length > 2000) _serviceLogs.removeAt(0);
+              });
+            }
+          },
+          onError: (Object error) {
+            if (mounted) {
+              showResourceError(context, 'Stream service logs', error);
+            }
+          },
+        );
   }
 
   @override
   Widget build(BuildContext context) {
     final cardBgColor = AppColors.cardBg(context);
     final borderColor = AppColors.borderColor(context);
-    final primaryContainerColor = Theme.of(context).colorScheme.primaryContainer;
-    final onPrimaryContainerColor = Theme.of(context).colorScheme.onPrimaryContainer;
+    final primaryContainerColor = Theme.of(
+      context,
+    ).colorScheme.primaryContainer;
+    final onPrimaryContainerColor = Theme.of(
+      context,
+    ).colorScheme.onPrimaryContainer;
 
-    final fileName = p.basename(widget.stack.configFiles);
+    final fileName = _selectedFile == null ? '' : p.basename(_selectedFile!);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -584,7 +861,10 @@ class __ComposeStackDetailViewState extends ConsumerState<_ComposeStackDetailVie
         // Back Header
         Row(
           children: [
-            IconButton(icon: const Icon(Icons.arrow_back), onPressed: widget.onBack),
+            IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: widget.onBack,
+            ),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -594,26 +874,45 @@ class __ComposeStackDetailViewState extends ConsumerState<_ComposeStackDetailVie
               ),
             ),
             ElevatedButton.icon(
-              onPressed: _savingYaml
+              onPressed:
+                  (_savingYaml ||
+                      _loadingYaml ||
+                      _yamlError != null ||
+                      _selectedFile == null)
                   ? null
                   : () async {
-                      final messenger = ScaffoldMessenger.of(context);
+                      final savedContent = _yamlController.text;
                       setState(() => _savingYaml = true);
                       try {
                         await ref
                             .read(composeCliClientProvider)
-                            .writeComposeFile(widget.stack.configFiles, _yamlController.text);
-                        if (mounted) {
-                          messenger.showSnackBar(
-                            const SnackBar(content: Text('Compose file updated successfully')),
+                            .writeComposeFile(_selectedFile!, savedContent);
+                        if (context.mounted) {
+                          _loadedYaml = savedContent;
+                          ref.invalidate(
+                            composeAvailableProfilesProvider(
+                              widget.stack.configFiles,
+                            ),
                           );
+                          showMessageDialog(
+                            context,
+                            title: 'Information',
+                            message: 'Compose file updated successfully',
+                            type: MessageType.info,
+                          );
+                        }
+                      } catch (error) {
+                        if (context.mounted) {
+                          showResourceError(context, 'Save $fileName', error);
                         }
                       } finally {
                         if (mounted) setState(() => _savingYaml = false);
                       }
                     },
               icon: const Icon(Icons.save, size: 18),
-              label: Text('Save ${fileName.isEmpty ? "docker-compose.yml" : fileName}'),
+              label: Text(
+                'Save ${fileName.isEmpty ? "docker-compose.yml" : fileName}',
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryContainerColor,
                 foregroundColor: onPrimaryContainerColor,
@@ -622,6 +921,9 @@ class __ComposeStackDetailViewState extends ConsumerState<_ComposeStackDetailVie
           ],
         ),
         const SizedBox(height: 16),
+
+        ComposeProfilesControl(configFiles: widget.stack.configFiles),
+        const SizedBox(height: 8),
 
         // Responsive Split View (Side-by-Side on wide screens, Vertical on narrow)
         Expanded(
@@ -645,14 +947,17 @@ class __ComposeStackDetailViewState extends ConsumerState<_ComposeStackDetailVie
                       children: [
                         Text(
                           'Stack Services',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 10),
                         Expanded(
                           child: _services.isEmpty
-                              ? const Center(child: Text('No service container information'))
+                              ? const Center(
+                                  child: Text(
+                                    'No service container information',
+                                  ),
+                                )
                               : ListView.builder(
                                   itemCount: _services.length,
                                   itemBuilder: (ctx, idx) {
@@ -667,11 +972,17 @@ class __ComposeStackDetailViewState extends ConsumerState<_ComposeStackDetailVie
                                       ),
                                       subtitle: Text(
                                         'State: ${s.state}',
-                                        style: GoogleFonts.jetBrainsMono(fontSize: 11),
+                                        style: GoogleFonts.jetBrainsMono(
+                                          fontSize: 11,
+                                        ),
                                       ),
                                       trailing: IconButton(
-                                        icon: const Icon(Icons.terminal, size: 18),
-                                        onPressed: () => _listenServiceLogs(s.name),
+                                        icon: const Icon(
+                                          Icons.terminal,
+                                          size: 18,
+                                        ),
+                                        onPressed: () =>
+                                            _listenServiceLogs(s.name),
                                       ),
                                     );
                                   },
@@ -709,26 +1020,54 @@ class __ComposeStackDetailViewState extends ConsumerState<_ComposeStackDetailVie
               final yamlEditorSection = Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0C0E11),
+                  color: AppColors.cardBg(context),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: borderColor),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      fileName.isEmpty ? 'docker-compose.yml' : fileName,
-                      style: GoogleFonts.jetBrainsMono(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: Theme.of(context).colorScheme.primary,
+                    if (widget.stack.configPaths.length > 1)
+                      DropdownButton<String>(
+                        value: _selectedFile,
+                        isExpanded: true,
+                        hint: const Text('Compose file'),
+                        items: widget.stack.configPaths
+                            .map(
+                              (path) => DropdownMenuItem(
+                                value: path,
+                                child: Text(
+                                  path,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: _savingYaml || _loadingYaml
+                            ? null
+                            : _selectFile,
+                      )
+                    else
+                      Text(
+                        fileName.isEmpty ? 'docker-compose.yml' : fileName,
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                       ),
-                    ),
                     const SizedBox(height: 10),
                     Divider(color: borderColor),
                     Expanded(
                       child: _loadingYaml
                           ? const Center(child: CircularProgressIndicator())
+                          : _yamlError != null
+                          ? Center(
+                              child: Text(
+                                'Unable to load file: $_yamlError',
+                                style: const TextStyle(color: AppColors.error),
+                              ),
+                            )
                           : TextField(
                               controller: _yamlController,
                               maxLines: null,

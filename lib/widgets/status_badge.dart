@@ -2,19 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
-enum StatusBadgeType {
-  running,
-  paused,
-  exited,
-  created,
-  restarting,
-  unknown,
-}
+enum StatusBadgeType { running, paused, exited, created, restarting, unknown }
 
-enum StatusBadgeSize {
-  medium,
-  large,
-}
+enum StatusBadgeSize { medium, large }
 
 class StatusBadge extends StatelessWidget {
   final String statusText;
@@ -28,20 +18,51 @@ class StatusBadge extends StatelessWidget {
     this.size = StatusBadgeSize.medium,
   });
 
-  factory StatusBadge.fromState(String stateText, {StatusBadgeSize size = StatusBadgeSize.medium}) {
+  factory StatusBadge.fromState(
+    String stateText, {
+    StatusBadgeSize size = StatusBadgeSize.medium,
+  }) {
     final lower = stateText.toLowerCase();
-    if (lower.contains('running') || lower.contains('up') || lower == 'active') {
-      return StatusBadge(statusText: stateText, type: StatusBadgeType.running, size: size);
+    if (lower.contains('running') ||
+        lower.contains('up') ||
+        lower == 'active') {
+      return StatusBadge(
+        statusText: stateText,
+        type: StatusBadgeType.running,
+        size: size,
+      );
     } else if (lower.contains('pause')) {
-      return StatusBadge(statusText: stateText, type: StatusBadgeType.paused, size: size);
-    } else if (lower.contains('exit') || lower.contains('dead') || lower.contains('stop')) {
-      return StatusBadge(statusText: stateText, type: StatusBadgeType.exited, size: size);
+      return StatusBadge(
+        statusText: stateText,
+        type: StatusBadgeType.paused,
+        size: size,
+      );
+    } else if (lower.contains('exit') ||
+        lower.contains('dead') ||
+        lower.contains('stop')) {
+      return StatusBadge(
+        statusText: stateText,
+        type: StatusBadgeType.exited,
+        size: size,
+      );
     } else if (lower.contains('create')) {
-      return StatusBadge(statusText: stateText, type: StatusBadgeType.created, size: size);
+      return StatusBadge(
+        statusText: stateText,
+        type: StatusBadgeType.created,
+        size: size,
+      );
     } else if (lower.contains('restart')) {
-      return StatusBadge(statusText: stateText, type: StatusBadgeType.restarting, size: size);
+      return StatusBadge(
+        statusText: stateText,
+        type: StatusBadgeType.restarting,
+        size: size,
+      );
     }
-    return StatusBadge(statusText: stateText, type: StatusBadgeType.unknown, size: size);
+    return StatusBadge(
+      statusText: stateText,
+      type: StatusBadgeType.unknown,
+      size: size,
+    );
   }
 
   @override
@@ -49,51 +70,56 @@ class StatusBadge extends StatelessWidget {
     final semanticColor = _getSemanticColor();
 
     final isLarge = size == StatusBadgeSize.large;
-    final horizontalPadding = isLarge ? 14.0 : 12.0;
-    final verticalPadding = isLarge ? 7.0 : 5.0;
-    final dotSize = isLarge ? 8.0 : 7.0;
+    final horizontalPadding = isLarge ? 10.0 : 8.0;
+    final verticalPadding = isLarge ? 4.0 : 3.0;
+    final dotSize = isLarge ? 7.0 : 6.0;
     final fontSize = isLarge ? 12.0 : 11.0;
 
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: verticalPadding),
-      decoration: BoxDecoration(
-        color: semanticColor.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: semanticColor.withValues(alpha: 0.40),
-          width: 1.2,
+    return Align(
+      alignment: Alignment.centerLeft,
+      widthFactor: 1,
+      heightFactor: 1,
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: horizontalPadding,
+          vertical: verticalPadding,
         ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: dotSize,
-            height: dotSize,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: semanticColor,
-              boxShadow: [
-                BoxShadow(
-                  color: semanticColor.withValues(alpha: 0.5),
-                  blurRadius: 4,
-                  spreadRadius: 1,
+        decoration: BoxDecoration(
+          color: semanticColor.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: semanticColor.withValues(alpha: 0.40),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: dotSize,
+              height: dotSize,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: semanticColor,
+              ),
+            ),
+            SizedBox(width: isLarge ? 6 : 5),
+            Flexible(
+              child: Text(
+                statusText.toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontFamily: 'Hanken Grotesk',
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.4,
+                  color: semanticColor,
                 ),
-              ],
+              ),
             ),
-          ),
-          SizedBox(width: isLarge ? 8 : 7),
-          Text(
-            statusText.toUpperCase(),
-            style: TextStyle(
-              fontFamily: 'Hanken Grotesk',
-              fontSize: fontSize,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.8,
-              color: semanticColor,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

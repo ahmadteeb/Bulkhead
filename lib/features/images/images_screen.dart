@@ -1,3 +1,4 @@
+import '../../widgets/message_dialog.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,8 +9,11 @@ import '../../providers/connection_status_provider.dart';
 import '../../providers/containers_provider.dart';
 import '../../providers/images_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../theme/design_tokens.dart';
 import '../../widgets/confirm_dialog.dart';
+import '../../widgets/resource_action.dart';
 import '../../widgets/data_table_shell.dart';
+import '../../widgets/page_header.dart';
 
 class ImagesScreen extends ConsumerStatefulWidget {
   const ImagesScreen({super.key});
@@ -68,123 +72,120 @@ class _ImagesScreenState extends ConsumerState<ImagesScreen> {
     final filteredImages = ref.watch(filteredImagesProvider);
 
     final primaryColor = Theme.of(context).colorScheme.primary;
-    final primaryContainerColor = Theme.of(context).colorScheme.primaryContainer;
-    final onPrimaryContainerColor = Theme.of(context).colorScheme.onPrimaryContainer;
+    final primaryContainerColor = Theme.of(
+      context,
+    ).colorScheme.primaryContainer;
+    final onPrimaryContainerColor = Theme.of(
+      context,
+    ).colorScheme.onPrimaryContainer;
     final onSurfaceColor = Theme.of(context).colorScheme.onSurface;
     final mutedTextColor = Theme.of(context).textTheme.bodySmall?.color;
 
-    final isAllSelected = filteredImages.isNotEmpty &&
+    final isAllSelected =
+        filteredImages.isNotEmpty &&
         filteredImages.every((img) => _selectedIds.contains(img.id));
-    final isSomeSelected = filteredImages.any((img) => _selectedIds.contains(img.id));
-    final selectAllValue = isAllSelected ? true : (isSomeSelected ? null : false);
+    final isSomeSelected = filteredImages.any(
+      (img) => _selectedIds.contains(img.id),
+    );
+    final selectAllValue = isAllSelected
+        ? true
+        : (isSomeSelected ? null : false);
 
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(DesignTokens.pagePadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isNarrow = constraints.maxWidth < 750;
-              final titleSection = Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Docker Images',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Inspect local registry, pull images, and prune unused layers',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              );
-
-              final actions = Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      final confirm = await ConfirmDialog.show(
+          PageHeader(
+            title: 'Docker Images',
+            subtitle:
+                'Inspect local registry, pull images, and prune unused layers',
+            actions: Wrap(
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final confirm = await ConfirmDialog.show(
+                      context,
+                      title: 'Prune Unused Images',
+                      message:
+                          'Remove all dangling images not referenced by any container?',
+                      confirmLabel: 'Prune',
+                      isDestructive: true,
+                    );
+                    if (confirm == true && context.mounted) {
+                      final res = await withProgressDialog(
                         context,
-                        title: 'Prune Unused Images',
-                        message: 'Remove all dangling images not referenced by any container?',
-                        confirmLabel: 'Prune',
-                        isDestructive: true,
+                        'Cleaning up images',
+                        () => ref
+                            .read(imagesNotifierProvider.notifier)
+                            .pruneImages(),
                       );
-                      if (confirm == true && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Pruning unused images...')),
-                        );
-                        final res = await ref.read(imagesNotifierProvider.notifier).pruneImages();
-                        final reclaimed = res['SpaceReclaimed'] as int? ?? 0;
-                        final deleted = (res['ImagesDeleted'] as List?)?.length ?? 0;
+                      if (res['Error'] != null) {
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Prune complete! Deleted $deleted image(s), reclaimed ${_formatBytes(reclaimed)} space.',
-                              ),
-                              backgroundColor: AppColors.success,
-                            ),
+                          showMessageDialog(
+                            context,
+                            title: 'Operation failed',
+                            message: 'Cleanup failed: ${res['Error']}',
+                            type: MessageType.error,
                           );
                         }
+                        return;
                       }
-                    },
-                    icon: const Icon(Icons.cleaning_services_outlined, size: 18),
-                    label: Text(isNarrow ? 'Prune' : 'Prune Unused'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.error,
-                      side: BorderSide(color: AppColors.borderColor(context)),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  ElevatedButton.icon(
-                    onPressed: () => _showPullDialog(context, ref),
-                    icon: const Icon(Icons.download_outlined, size: 18),
-                    label: const Text('Pull Image'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryContainerColor,
-                      foregroundColor: onPrimaryContainerColor,
-                      elevation: 0,
-                    ),
-                  ),
-                ],
-              );
 
-              if (isNarrow) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    titleSection,
-                    const SizedBox(height: 12),
-                    actions,
-                  ],
-                );
-              }
-
-              return Row(
-                children: [
-                  Expanded(child: titleSection),
-                  actions,
-                ],
-              );
-            },
+                      final reclaimed = res['SpaceReclaimed'] as int? ?? 0;
+                      final deleted =
+                          (res['ImagesDeleted'] as List?)?.length ?? 0;
+                      if (context.mounted) {
+                        showMessageDialog(
+                          context,
+                          title: 'Completed',
+                          message:
+                              'Prune complete! Deleted $deleted image(s), reclaimed ${_formatBytes(reclaimed)} space.',
+                          type: MessageType.success,
+                        );
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.cleaning_services_outlined, size: 18),
+                  label: const Text('Prune unused'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.error,
+                    side: BorderSide(color: AppColors.borderColor(context)),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                ElevatedButton.icon(
+                  onPressed: () => _showPullDialog(context, ref),
+                  icon: const Icon(Icons.download_outlined, size: 18),
+                  label: const Text('Pull Image'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryContainerColor,
+                    foregroundColor: onPrimaryContainerColor,
+                    elevation: 0,
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 20),
 
           // Data Table
           Expanded(
             child: DataTableShell(
+              errorMessage: imagesState.error,
+              onRetry: () =>
+                  ref.read(imagesNotifierProvider.notifier).refreshImages(),
               title: 'Local Registry Images',
               subtitle: _selectedIds.isEmpty
                   ? '${filteredImages.length} images available locally'
                   : '${_selectedIds.length} image(s) selected',
               showSelectAll: true,
               selectAllValue: selectAllValue,
-              onSelectAllChanged: (val) => _toggleSelectAll(filteredImages, val),
+              onSelectAllChanged: (val) =>
+                  _toggleSelectAll(filteredImages, val),
               bulkActions: _selectedIds.isEmpty
                   ? null
                   : [
@@ -193,18 +194,27 @@ class _ImagesScreenState extends ConsumerState<ImagesScreen> {
                           final confirm = await ConfirmDialog.show(
                             context,
                             title: 'Remove Selected Images',
-                            message: 'Remove ${_selectedIds.length} selected images?',
+                            message:
+                                'Remove ${_selectedIds.length} selected images?',
                             confirmLabel: 'Delete All',
                             isDestructive: true,
                           );
                           if (confirm == true) {
                             final ids = List<String>.from(_selectedIds);
-                            for (final id in ids) {
-                              try {
-                                await ref.read(imagesNotifierProvider.notifier).removeImage(id, force: true);
-                              } catch (_) {}
+                            if (!context.mounted) return;
+                            if (!await runBulkResourceAction(
+                              context,
+                              'Remove image',
+                              ids,
+                              (id) => ref
+                                  .read(imagesNotifierProvider.notifier)
+                                  .removeImage(id, force: true),
+                              onCompleted: (id) =>
+                                  setState(() => _selectedIds.remove(id)),
+                            )) {
+                              return;
                             }
-                            setState(() => _selectedIds.clear());
+                            if (mounted) setState(() => _selectedIds.clear());
                           }
                         },
                         icon: const Icon(Icons.delete_outline, size: 16),
@@ -223,7 +233,10 @@ class _ImagesScreenState extends ConsumerState<ImagesScreen> {
                 decoration: const InputDecoration(
                   hintText: 'Search image repository or tag...',
                   prefixIcon: Icon(Icons.search, size: 18),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
                 ),
               ),
               columns: const [
@@ -239,7 +252,10 @@ class _ImagesScreenState extends ConsumerState<ImagesScreen> {
                 final isSelected = _selectedIds.contains(img.id);
 
                 return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
                   child: Row(
                     children: [
                       // Checkbox
@@ -323,47 +339,81 @@ class _ImagesScreenState extends ConsumerState<ImagesScreen> {
                         child: Row(
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.play_arrow_outlined, color: AppColors.success, size: 20),
+                              icon: const Icon(
+                                Icons.play_arrow_outlined,
+                                color: AppColors.success,
+                                size: 20,
+                              ),
                               tooltip: 'Run Container from Image',
-                              onPressed: () {
-                                final tag = img.primaryTag.contains('<none>') ? img.id : img.primaryTag;
-                                final name = 'container_${DateTime.now().millisecondsSinceEpoch % 10000}';
-                                ref.read(containersNotifierProvider.notifier).createContainer(
-                                      name: name,
-                                      image: tag,
-                                      autoStart: true,
-                                    );
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Spawned container "$name" from $tag'),
-                                    backgroundColor: AppColors.success,
-                                  ),
+                              onPressed: () async {
+                                final tag = img.primaryTag.contains('<none>')
+                                    ? img.id
+                                    : img.primaryTag;
+                                final name =
+                                    'container_${DateTime.now().microsecondsSinceEpoch}';
+                                if (!await runResourceAction(
+                                  context,
+                                  'Run image $tag',
+                                  () async {
+                                    await ref
+                                        .read(
+                                          containersNotifierProvider.notifier,
+                                        )
+                                        .createContainer(
+                                          name: name,
+                                          image: tag,
+                                          autoStart: true,
+                                        );
+                                  },
+                                )) {
+                                  return;
+                                }
+                                if (!context.mounted) return;
+
+                                showMessageDialog(
+                                  context,
+                                  title: 'Completed',
+                                  message:
+                                      'Spawned container "$name" from $tag',
+                                  type: MessageType.success,
                                 );
                               },
                             ),
                             IconButton(
-                              icon: const Icon(Icons.delete_outline, color: AppColors.error, size: 20),
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                color: AppColors.error,
+                                size: 20,
+                              ),
                               tooltip: 'Remove Image',
                               onPressed: () async {
                                 final confirm = await ConfirmDialog.show(
                                   context,
                                   title: 'Remove Image',
-                                  message: 'Permanently remove image "${img.primaryTag}"?',
+                                  message:
+                                      'Permanently remove image "${img.primaryTag}"?',
                                   confirmLabel: 'Remove',
                                   isDestructive: true,
                                 );
                                 if (confirm == true) {
                                   try {
-                                    await ref
-                                        .read(imagesNotifierProvider.notifier)
-                                        .removeImage(img.id, force: true);
+                                    if (!context.mounted) return;
+                                    if (!await runResourceAction(
+                                      context,
+                                      'Remove image: ${img.id}',
+                                      () => ref
+                                          .read(imagesNotifierProvider.notifier)
+                                          .removeImage(img.id, force: true),
+                                    )) {
+                                      return;
+                                    }
                                   } catch (e) {
                                     if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text('Remove failed: $e'),
-                                          backgroundColor: AppColors.error,
-                                        ),
+                                      showMessageDialog(
+                                        context,
+                                        title: 'Operation failed',
+                                        message: 'Remove failed: $e',
+                                        type: MessageType.error,
                                       );
                                     }
                                   }
@@ -391,10 +441,12 @@ class _PullImageProgressDialog extends ConsumerStatefulWidget {
   const _PullImageProgressDialog({required this.controller});
 
   @override
-  ConsumerState<_PullImageProgressDialog> createState() => __PullImageProgressDialogState();
+  ConsumerState<_PullImageProgressDialog> createState() =>
+      __PullImageProgressDialogState();
 }
 
-class __PullImageProgressDialogState extends ConsumerState<_PullImageProgressDialog> {
+class __PullImageProgressDialogState
+    extends ConsumerState<_PullImageProgressDialog> {
   bool _isPulling = false;
   bool _isFinished = false;
   String _status = '';
@@ -414,50 +466,56 @@ class __PullImageProgressDialogState extends ConsumerState<_PullImageProgressDia
     });
 
     final client = ref.read(dockerApiClientProvider);
-    _pullSub = client.pullImage(name).listen(
-      (data) {
-        if (!mounted) return;
-        final statusText = data['status'] as String? ?? '';
-        final id = data['id'] as String? ?? '';
-        final progress = data['progress'] as String? ?? '';
+    _pullSub = client
+        .pullImage(name)
+        .listen(
+          (data) {
+            if (!mounted) return;
+            final statusText = data['status'] as String? ?? '';
+            final id = data['id'] as String? ?? '';
+            final progress = data['progress'] as String? ?? '';
 
-        setState(() {
-          _status = statusText;
-          final line = id.isNotEmpty ? '$id: $statusText $progress' : statusText;
-          if (line.isNotEmpty) {
-            _progressLines.add(line);
-          }
-        });
+            setState(() {
+              _status = statusText;
+              final line = id.isNotEmpty
+                  ? '$id: $statusText $progress'
+                  : statusText;
+              if (line.isNotEmpty) {
+                _progressLines.add(line);
+              }
+            });
 
-        // Auto-scroll to bottom of log terminal
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_scrollController.hasClients) {
-            _scrollController.animateTo(
-              _scrollController.position.maxScrollExtent,
-              duration: const Duration(milliseconds: 100),
-              curve: Curves.easeOut,
-            );
-          }
-        });
-      },
-      onDone: () {
-        if (!mounted) return;
-        ref.read(imagesNotifierProvider.notifier).refreshImages();
-        setState(() {
-          _isPulling = false;
-          _isFinished = true;
-          _status = 'Pull Completed Successfully!';
-        });
-      },
-      onError: (err) {
-        if (!mounted) return;
-        setState(() {
-          _isPulling = false;
-          _isFinished = true;
-          _status = 'Pull Failed: $err';
-        });
-      },
-    );
+            // Auto-scroll to bottom of log terminal
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (_scrollController.hasClients) {
+                _scrollController.animateTo(
+                  _scrollController.position.maxScrollExtent,
+                  duration: const Duration(milliseconds: 100),
+                  curve: Curves.easeOut,
+                );
+              }
+            });
+          },
+          onDone: () {
+            if (!mounted) return;
+            ref.read(imagesNotifierProvider.notifier).refreshImages();
+            setState(() {
+              _isPulling = false;
+              _isFinished = true;
+              if (!_status.startsWith('Pull Failed:')) {
+                _status = 'Pull Completed Successfully!';
+              }
+            });
+          },
+          onError: (err) {
+            if (!mounted) return;
+            setState(() {
+              _isPulling = false;
+              _isFinished = true;
+              _status = 'Pull Failed: $err';
+            });
+          },
+        );
   }
 
   void _cancelPull() {
@@ -504,7 +562,9 @@ class __PullImageProgressDialogState extends ConsumerState<_PullImageProgressDia
                 style: GoogleFonts.jetBrainsMono(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: _status.contains('Failed') ? AppColors.error : primaryColor,
+                  color: _status.contains('Failed')
+                      ? AppColors.error
+                      : primaryColor,
                 ),
               ),
               const SizedBox(height: 10),

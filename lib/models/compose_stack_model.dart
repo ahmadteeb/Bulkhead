@@ -17,7 +17,9 @@ class ComposeServiceInfo {
     return ComposeServiceInfo(
       name: json['Service'] as String? ?? json['Name'] as String? ?? 'service',
       containerId: json['ID'] as String? ?? json['Id'] as String? ?? '',
-      state: (json['State'] as String? ?? json['Status'] as String? ?? 'unknown').toLowerCase(),
+      state:
+          (json['State'] as String? ?? json['Status'] as String? ?? 'unknown')
+              .toLowerCase(),
       status: json['Status'] as String? ?? json['State'] as String? ?? '',
       ports: json['Ports'] as String? ?? json['Publishers']?.toString() ?? '',
     );
@@ -35,11 +37,36 @@ class ComposeStackModel {
     required this.configFiles,
   });
 
+  List<String> get configPaths => parseComposePaths(configFiles);
+
   factory ComposeStackModel.fromJson(Map<String, dynamic> json) {
     return ComposeStackModel(
       name: json['Name'] as String? ?? json['Project'] as String? ?? 'unnamed',
       status: json['Status'] as String? ?? 'running',
-      configFiles: json['ConfigFiles'] as String? ?? json['Config'] as String? ?? '',
+      configFiles:
+          json['ConfigFiles'] as String? ?? json['Config'] as String? ?? '',
     );
   }
 }
+
+List<String> parseComposePaths(String files) => files
+    .split(',')
+    .map((file) => file.trim())
+    .where((file) => file.isNotEmpty)
+    .toList();
+
+List<String> composeFileArguments(String files) {
+  final paths = parseComposePaths(files);
+  if (paths.isEmpty) throw ArgumentError('No Compose files were provided.');
+  return [
+    for (final path in paths) ...['-f', path],
+  ];
+}
+
+List<String> composeProfileArguments(Iterable<String> profiles) => [
+  for (final profile
+      in profiles
+          .map((profile) => profile.trim())
+          .where((profile) => profile.isNotEmpty)
+          .toSet()) ...['--profile', profile],
+];

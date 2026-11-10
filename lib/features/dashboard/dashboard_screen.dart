@@ -1,3 +1,4 @@
+import '../../widgets/message_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -9,6 +10,7 @@ import '../../providers/images_provider.dart';
 import '../../providers/networks_provider.dart';
 import '../../providers/volumes_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../theme/design_tokens.dart';
 import '../../widgets/confirm_dialog.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -37,9 +39,14 @@ class DashboardScreen extends ConsumerWidget {
     final systemDfAsync = ref.watch(systemDfProvider);
 
     final totalContainers = containersState.containers.length;
-    final runningContainers = containersState.containers.where((c) => c.state == 'running').length;
+    final runningContainers = containersState.containers
+        .where((c) => c.state == 'running')
+        .length;
     final totalImages = imagesState.images.length;
-    final totalImageBytes = imagesState.images.fold<int>(0, (sum, img) => sum + img.size);
+    final totalImageBytes = imagesState.images.fold<int>(
+      0,
+      (sum, img) => sum + img.size,
+    );
     final totalVolumes = volumesState.volumes.length;
     final totalNetworks = networksState.networks.length;
 
@@ -49,7 +56,7 @@ class DashboardScreen extends ConsumerWidget {
     int volumesBytes = 0;
 
     systemDfAsync.whenData((df) {
-      if ((df['images'] ?? 0) > 0) imagesBytes = df['images']!;
+      imagesBytes = df['images'] ?? totalImageBytes;
       containersBytes = df['containers'] ?? 0;
       volumesBytes = df['volumes'] ?? 0;
     });
@@ -66,18 +73,20 @@ class DashboardScreen extends ConsumerWidget {
       volumeProgress = (volumesBytes / totalBytes).clamp(0.0, 1.0);
     } else {
       imageProgress = 0.0;
-      containerProgress = totalContainers == 0 ? 0.0 : (runningContainers / totalContainers);
+      containerProgress = 0.0;
       volumeProgress = 0.0;
     }
 
     final primaryColor = Theme.of(context).colorScheme.primary;
-    final primaryContainerColor = Theme.of(context).colorScheme.primaryContainer;
+    final primaryContainerColor = Theme.of(
+      context,
+    ).colorScheme.primaryContainer;
     final cardBgColor = AppColors.cardBg(context);
     final borderColor = AppColors.borderColor(context);
     final containerLowColor = AppColors.containerLow(context);
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(DesignTokens.pagePadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -89,12 +98,12 @@ class DashboardScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Dashboard Overview',
+                    'Workspace overview',
                     style: Theme.of(context).textTheme.headlineMedium,
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Local Docker Engine status & system metrics',
+                    'Your containers, storage, and engine activity in one place.',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
@@ -104,37 +113,64 @@ class DashboardScreen extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   OutlinedButton.icon(
-                    onPressed: () async {
-                      final confirm = await ConfirmDialog.show(
-                        context,
-                        title: 'System Prune All',
-                        message: 'Remove all stopped containers, unused networks, dangling images, and volumes?',
-                        confirmLabel: 'Prune System',
-                        isDestructive: true,
-                      );
-                      if (confirm == true && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Pruning Docker system artifacts...')),
-                        );
-                        final client = ref.read(dockerApiClientProvider);
-                        await client.systemPruneAll();
-                        ref.read(containersNotifierProvider.notifier).refreshContainers();
-                        ref.read(imagesNotifierProvider.notifier).refreshImages();
-                        ref.read(volumesNotifierProvider.notifier).refreshVolumes();
-                        ref.read(networksNotifierProvider.notifier).refreshNetworks();
-                        ref.invalidate(systemDfProvider);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('System Prune complete! All unused resources cleaned.'),
-                              backgroundColor: AppColors.success,
-                            ),
-                          );
-                        }
-                      }
-                    },
-                    icon: const Icon(Icons.cleaning_services_outlined, size: 18),
-                    label: const Text('Prune System'),
+                    onPressed: !connState.isConnected
+                        ? null
+                        : () async {
+                            final confirm = await ConfirmDialog.show(
+                              context,
+                              title: 'Clean up unused resources',
+                              message:
+                                  'Permanently remove stopped containers, unused networks, dangling images, and unused anonymous volumes. Container writable data will be lost.',
+                              confirmLabel: 'Prune System',
+                              isDestructive: true,
+                            );
+                            if (confirm == true && context.mounted) {
+                              final client = ref.read(dockerApiClientProvider);
+                              try {
+                                await withProgressDialog(
+                                  context,
+                                  'Cleaning up Docker resources',
+                                  client.systemPruneAll,
+                                );
+                                if (!context.mounted) return;
+                                showMessageDialog(
+                                  context,
+                                  title: 'Completed',
+                                  message: 'Unused resources cleaned up.',
+                                  type: MessageType.success,
+                                );
+                              } catch (error) {
+                                if (!context.mounted) return;
+                                showMessageDialog(
+                                  context,
+                                  title: 'Operation failed',
+                                  message: 'Cleanup failed: $error',
+                                  type: MessageType.error,
+                                );
+                              } finally {
+                                if (context.mounted) {
+                                  ref
+                                      .read(containersNotifierProvider.notifier)
+                                      .refreshContainers();
+                                  ref
+                                      .read(imagesNotifierProvider.notifier)
+                                      .refreshImages();
+                                  ref
+                                      .read(volumesNotifierProvider.notifier)
+                                      .refreshVolumes();
+                                  ref
+                                      .read(networksNotifierProvider.notifier)
+                                      .refreshNetworks();
+                                  ref.invalidate(systemDfProvider);
+                                }
+                              }
+                            }
+                          },
+                    icon: const Icon(
+                      Icons.cleaning_services_outlined,
+                      size: 18,
+                    ),
+                    label: const Text('Clean up'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.error,
                       side: BorderSide(color: AppColors.borderColor(context)),
@@ -172,26 +208,34 @@ class DashboardScreen extends ConsumerWidget {
               decoration: BoxDecoration(
                 color: AppColors.error.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                border: Border.all(
+                  color: AppColors.error.withValues(alpha: 0.3),
+                ),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.error_outline_rounded, color: AppColors.error, size: 28),
+                  const Icon(
+                    Icons.error_outline_rounded,
+                    color: AppColors.error,
+                    size: 28,
+                  ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Docker Daemon Connection Warning',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          'Connect to your Docker engine',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
                                 color: AppColors.error,
                                 fontWeight: FontWeight.w700,
                               ),
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          connState.errorMessage ?? 'Unable to connect to Docker Unix Socket.',
+                          connState.errorMessage ??
+                              'Unable to connect to Docker Unix Socket.',
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                       ],
@@ -199,7 +243,9 @@ class DashboardScreen extends ConsumerWidget {
                   ),
                   const SizedBox(width: 12),
                   ElevatedButton(
-                    onPressed: () => ref.read(connectionStatusProvider.notifier).checkConnection(),
+                    onPressed: () => ref
+                        .read(connectionStatusProvider.notifier)
+                        .checkConnection(),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.error,
                       foregroundColor: Colors.white,
@@ -210,6 +256,73 @@ class DashboardScreen extends ConsumerWidget {
               ),
             ),
 
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 24),
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: primaryColor.withValues(alpha: .07),
+              borderRadius: BorderRadius.circular(DesignTokens.panelRadius),
+              border: Border.all(color: primaryColor.withValues(alpha: .18)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: cardBgColor,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.dns_outlined,
+                    size: 28,
+                    color: primaryColor,
+                  ),
+                ),
+                const SizedBox(width: 18),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        connState.isConnected
+                            ? 'Your engine at a glance'
+                            : 'Your Docker workspace',
+                        style: Theme.of(
+                          context,
+                        ).textTheme.titleMedium?.copyWith(fontSize: 20),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        connState.isConnected
+                            ? '$runningContainers of $totalContainers containers running · $totalNetworks networks · ${_formatBytes(totalBytes)} in use'
+                            : 'Start Docker and check your connection to manage local resources.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          if (systemDfAsync.hasError)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Storage usage is unavailable. Check the Docker connection and try again.',
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => ref.invalidate(systemDfProvider),
+                    child: const Text('Retry storage'),
+                  ),
+                ],
+              ),
+            ),
           // Summary Metric Cards
           LayoutBuilder(
             builder: (context, constraints) {
@@ -218,7 +331,8 @@ class DashboardScreen extends ConsumerWidget {
               if (width < 900) crossAxisCount = 2;
               if (width < 500) crossAxisCount = 1;
 
-              final cardWidth = (width - ((crossAxisCount - 1) * 16)) / crossAxisCount;
+              final cardWidth =
+                  (width - ((crossAxisCount - 1) * 16)) / crossAxisCount;
 
               return Wrap(
                 spacing: 16,
@@ -291,10 +405,9 @@ class DashboardScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Storage & Resource Usage',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
+                        'Storage breakdown',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -314,9 +427,7 @@ class DashboardScreen extends ConsumerWidget {
                       _buildDiskUsageBar(
                         context,
                         label: 'Writable Container Data',
-                        valueText: containersBytes > 0
-                            ? _formatBytes(containersBytes)
-                            : '$runningContainers active slots',
+                        valueText: _formatBytes(containersBytes),
                         progress: containerProgress,
                         color: AppColors.success,
                       ),
@@ -324,9 +435,7 @@ class DashboardScreen extends ConsumerWidget {
                       _buildDiskUsageBar(
                         context,
                         label: 'Volume Storage Points',
-                        valueText: volumesBytes > 0
-                            ? _formatBytes(volumesBytes)
-                            : '$totalVolumes volumes',
+                        valueText: _formatBytes(volumesBytes),
                         progress: volumeProgress,
                         color: AppColors.warning,
                       ),
@@ -334,7 +443,10 @@ class DashboardScreen extends ConsumerWidget {
                   ),
                 ),
 
-                if (isNarrow) const SizedBox(height: 24) else const SizedBox(width: 24),
+                if (isNarrow)
+                  const SizedBox(height: 24)
+                else
+                  const SizedBox(width: 24),
 
                 // Docker Events Stream
                 Container(
@@ -352,11 +464,10 @@ class DashboardScreen extends ConsumerWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              'Real-Time Docker Events',
+                              'Recent activity',
                               overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w700),
                             ),
                           ),
                           Container(
@@ -369,7 +480,7 @@ class DashboardScreen extends ConsumerWidget {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            'SUBSCRIBED',
+                            connState.isConnected ? 'ENGINE EVENTS' : 'OFFLINE',
                             style: GoogleFonts.jetBrainsMono(
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
@@ -386,7 +497,9 @@ class DashboardScreen extends ConsumerWidget {
                         child: events.isEmpty
                             ? Center(
                                 child: Text(
-                                  'Listening for engine activity...',
+                                  connState.isConnected
+                                      ? 'Engine activity will appear here.'
+                                      : 'Connect your engine to see activity.',
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
                               )
@@ -399,10 +512,15 @@ class DashboardScreen extends ConsumerWidget {
                                     child: Row(
                                       children: [
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 2,
+                                          ),
                                           decoration: BoxDecoration(
                                             color: containerLowColor,
-                                            borderRadius: BorderRadius.circular(4),
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
                                           ),
                                           child: Text(
                                             ev.type.toUpperCase(),
@@ -419,7 +537,9 @@ class DashboardScreen extends ConsumerWidget {
                                           style: GoogleFonts.jetBrainsMono(
                                             fontSize: 12,
                                             fontWeight: FontWeight.w600,
-                                            color: Theme.of(context).colorScheme.onSurface,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurface,
                                           ),
                                         ),
                                         const SizedBox(width: 10),
@@ -429,7 +549,9 @@ class DashboardScreen extends ConsumerWidget {
                                             overflow: TextOverflow.ellipsis,
                                             style: GoogleFonts.jetBrainsMono(
                                               fontSize: 12,
-                                              color: Theme.of(context).textTheme.bodySmall?.color,
+                                              color: Theme.of(
+                                                context,
+                                              ).textTheme.bodySmall?.color,
                                             ),
                                           ),
                                         ),
@@ -437,7 +559,9 @@ class DashboardScreen extends ConsumerWidget {
                                           '${ev.time.hour.toString().padLeft(2, '0')}:${ev.time.minute.toString().padLeft(2, '0')}:${ev.time.second.toString().padLeft(2, '0')}',
                                           style: GoogleFonts.jetBrainsMono(
                                             fontSize: 10,
-                                            color: Theme.of(context).textTheme.bodySmall?.color,
+                                            color: Theme.of(
+                                              context,
+                                            ).textTheme.bodySmall?.color,
                                           ),
                                         ),
                                       ],
@@ -498,12 +622,19 @@ class DashboardScreen extends ConsumerWidget {
                   title,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                      ),
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8,
+                  ),
                 ),
               ),
-              Icon(icon, color: accentColor, size: 22),
+              Container(
+                padding: const EdgeInsets.all(9),
+                decoration: BoxDecoration(
+                  color: accentColor.withValues(alpha: .10),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: accentColor, size: 20),
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -543,9 +674,9 @@ class DashboardScreen extends ConsumerWidget {
               child: Text(
                 label,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
             ),
             const SizedBox(width: 8),

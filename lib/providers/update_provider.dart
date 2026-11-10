@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,51 +8,67 @@ import '../models/update_model.dart';
 
 final updateCheckNotifierProvider =
     StateNotifierProvider<UpdateNotifier, AsyncValue<UpdateInfoModel?>>((ref) {
-  return UpdateNotifier();
-});
+      return UpdateNotifier();
+    });
 
 class UpdateNotifier extends StateNotifier<AsyncValue<UpdateInfoModel?>> {
+  Timer? _startupTimer;
+  HttpClient? _client;
+  Future<void>? _checkFuture;
+
   UpdateNotifier() : super(const AsyncValue.data(null)) {
     // Automatically check for updates 3 seconds after app start
-    Future.delayed(const Duration(seconds: 3), () {
+    _startupTimer = Timer(const Duration(seconds: 3), () {
       checkForUpdates();
     });
   }
 
-  Future<void> checkForUpdates({bool forceUserCheck = false}) async {
+  Future<void> checkForUpdates({bool forceUserCheck = false}) {
+    if (!mounted) return Future.value();
+    return _checkFuture ??= _checkForUpdates(
+      forceUserCheck: forceUserCheck,
+    ).whenComplete(() => _checkFuture = null);
+  }
+
+  Future<void> _checkForUpdates({required bool forceUserCheck}) async {
+    if (!mounted) return;
+    _startupTimer?.cancel();
     await AppVersion.init();
-    if (!forceUserCheck && state.value != null && state.value!.hasUpdate) {
+    if (!mounted) return;
+    if (!forceUserCheck && state.valueOrNull?.hasUpdate == true) {
       return;
     }
 
     state = const AsyncValue.loading();
 
     try {
-      final client = HttpClient();
+      final client = HttpClient()
+        ..connectionTimeout = const Duration(seconds: 10);
+      _client = client;
       client.userAgent = 'Bulkhead-Flutter-App';
 
       final uri = Uri.parse(AppVersion.latestReleaseUrl);
       final request = await client.getUrl(uri);
       request.headers.set('Accept', 'application/vnd.github+json');
 
-      final response = await request.close();
+      final response = await request.close().timeout(
+        const Duration(seconds: 15),
+      );
+      if (!mounted) return;
       if (response.statusCode != 200) {
-        state = AsyncValue.data(UpdateInfoModel(
-          latestVersion: AppVersion.currentVersion,
-          currentVersion: AppVersion.currentVersion,
-          hasUpdate: false,
-          releaseNotes: '',
-          releaseHtmlUrl: AppVersion.releasesPageUrl,
-          assets: [],
-        ));
-        return;
+        throw HttpException('Update check failed: HTTP ${response.statusCode}');
       }
 
-      final body = await response.transform(utf8.decoder).join();
+      final body = await response
+          .transform(utf8.decoder)
+          .join()
+          .timeout(const Duration(seconds: 15));
+      if (!mounted) return;
       final json = jsonDecode(body) as Map<String, dynamic>;
 
-      final rawTag = json['tag_name'] as String? ?? 'v${AppVersion.currentVersion}';
-      final latestVersion = rawTag.replaceAll('v', '').trim();
+      final rawTag =
+          json['tag_name'] as String? ?? 'v${AppVersion.currentVersion}';
+      final latestVersion = rawTag.replaceFirst(RegExp(r'^[vV]'), '').trim();
       final bodyText = json['body'] as String? ?? '';
       final htmlUrl = json['html_url'] as String? ?? AppVersion.releasesPageUrl;
 
@@ -64,35 +81,33 @@ class UpdateNotifier extends StateNotifier<AsyncValue<UpdateInfoModel?>> {
         );
       }).toList();
 
-      final hasUpdate = _isVersionNewer(latestVersion, AppVersion.currentVersion);
+      final hasUpdate = AppVersion.isNewer(
+        latestVersion,
+        AppVersion.currentVersion,
+      );
 
-      state = AsyncValue.data(UpdateInfoModel(
-        latestVersion: latestVersion,
-        currentVersion: AppVersion.currentVersion,
-        hasUpdate: hasUpdate,
-        releaseNotes: bodyText,
-        releaseHtmlUrl: htmlUrl,
-        assets: assets,
-      ));
+      state = AsyncValue.data(
+        UpdateInfoModel(
+          latestVersion: latestVersion,
+          currentVersion: AppVersion.currentVersion,
+          hasUpdate: hasUpdate,
+          releaseNotes: bodyText,
+          releaseHtmlUrl: htmlUrl,
+          assets: assets,
+        ),
+      );
     } catch (e, stack) {
-      state = AsyncValue.error(e, stack);
+      if (mounted) state = AsyncValue.error(e, stack);
+    } finally {
+      _client?.close(force: true);
+      _client = null;
     }
   }
 
-  bool _isVersionNewer(String latest, String current) {
-    try {
-      final latestParts = latest.split('.').map((e) => int.tryParse(e) ?? 0).toList();
-      final currentParts = current.split('.').map((e) => int.tryParse(e) ?? 0).toList();
-
-      for (int i = 0; i < 3; i++) {
-        final l = i < latestParts.length ? latestParts[i] : 0;
-        final c = i < currentParts.length ? currentParts[i] : 0;
-        if (l > c) return true;
-        if (l < c) return false;
-      }
-      return false;
-    } catch (_) {
-      return latest != current;
-    }
+  @override
+  void dispose() {
+    _startupTimer?.cancel();
+    _client?.close(force: true);
+    super.dispose();
   }
 }

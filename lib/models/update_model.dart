@@ -24,28 +24,35 @@ class UpdateInfoModel {
     required this.assets,
   });
 
-  UpdateAssetModel? get platformAsset {
-    if (assets.isEmpty) return null;
-    if (Platform.isMacOS) {
-      return assets.firstWhere(
-        (a) => a.name.endsWith('.dmg') || a.name.contains('macos'),
-        orElse: () => assets.first,
+  UpdateAssetModel? get platformAsset =>
+      assetForPlatform(Platform.operatingSystem);
+
+  UpdateAssetModel? assetForPlatform(String platform) {
+    final candidates = assets.where((asset) {
+      final name = asset.name.toLowerCase();
+      return switch (platform) {
+        'macos' => name.endsWith('.dmg') || name.contains('macos'),
+        'windows' => name.endsWith('.zip') && name.contains('windows'),
+        'linux' =>
+          name.contains('linux') ||
+              name.endsWith('.deb') ||
+              name.endsWith('.rpm') ||
+              name.endsWith('.pkg.tar.zst'),
+        _ => false,
+      };
+    }).toList();
+    if (platform == 'linux') {
+      final portable = candidates.where(
+        (asset) => asset.name.toLowerCase().endsWith('.zip'),
       );
-    } else if (Platform.isWindows) {
-      return assets.firstWhere(
-        (a) => a.name.endsWith('.zip') && a.name.contains('windows'),
-        orElse: () => assets.first,
-      );
-    } else if (Platform.isLinux) {
-      return assets.firstWhere(
-        (a) =>
-            a.name.endsWith('.deb') ||
-            a.name.endsWith('.pkg.tar.zst') ||
-            a.name.endsWith('.rpm') ||
-            a.name.contains('linux'),
-        orElse: () => assets.first,
-      );
+      if (portable.isNotEmpty) return portable.first;
     }
-    return assets.first;
+    if (platform == 'macos') {
+      final diskImage = candidates.where(
+        (asset) => asset.name.toLowerCase().endsWith('.dmg'),
+      );
+      if (diskImage.isNotEmpty) return diskImage.first;
+    }
+    return candidates.firstOrNull;
   }
 }

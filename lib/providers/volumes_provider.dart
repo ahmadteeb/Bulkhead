@@ -8,11 +8,7 @@ class VolumesState {
   final bool isLoading;
   final String? error;
 
-  VolumesState({
-    required this.volumes,
-    this.isLoading = false,
-    this.error,
-  });
+  VolumesState({required this.volumes, this.isLoading = false, this.error});
 
   VolumesState copyWith({
     List<VolumeModel>? volumes,
@@ -45,27 +41,33 @@ final filteredVolumesProvider = Provider<List<VolumeModel>>((ref) {
 class VolumesNotifier extends StateNotifier<VolumesState> {
   final dynamic _client;
   final bool _isConnected;
+  int _refreshGeneration = 0;
 
   VolumesNotifier(this._client, this._isConnected)
-      : super(VolumesState(volumes: [], isLoading: true)) {
+    : super(VolumesState(volumes: [], isLoading: true)) {
     if (_isConnected) {
       refreshVolumes();
     } else {
-      state = VolumesState(volumes: [], isLoading: false, error: 'Docker daemon disconnected');
+      state = VolumesState(
+        volumes: [],
+        isLoading: false,
+        error: 'Docker daemon disconnected',
+      );
     }
   }
 
   Future<void> refreshVolumes({bool silent = false}) async {
     if (!mounted) return;
+    final generation = ++_refreshGeneration;
     if (!silent) {
       state = state.copyWith(isLoading: true, error: null);
     }
     try {
       final list = await _client.getVolumes();
-      if (!mounted) return;
+      if (!mounted || generation != _refreshGeneration) return;
       state = VolumesState(volumes: list, isLoading: false, error: null);
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || generation != _refreshGeneration) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
@@ -113,7 +115,7 @@ class VolumesNotifier extends StateNotifier<VolumesState> {
 
 final volumesNotifierProvider =
     StateNotifierProvider<VolumesNotifier, VolumesState>((ref) {
-  final client = ref.watch(dockerApiClientProvider);
-  final connState = ref.watch(connectionStatusProvider);
-  return VolumesNotifier(client, connState.isConnected);
-});
+      final client = ref.watch(dockerApiClientProvider);
+      final connState = ref.watch(connectionStatusProvider);
+      return VolumesNotifier(client, connState.isConnected);
+    });

@@ -5,8 +5,11 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../models/network_model.dart';
 import '../../providers/networks_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../theme/design_tokens.dart';
 import '../../widgets/confirm_dialog.dart';
+import '../../widgets/resource_action.dart';
 import '../../widgets/data_table_shell.dart';
+import '../../widgets/page_header.dart';
 
 class NetworksScreen extends ConsumerStatefulWidget {
   const NetworksScreen({super.key});
@@ -83,15 +86,24 @@ class _NetworksScreenState extends ConsumerState<NetworksScreen> {
               onPressed: () async {
                 final name = nameController.text.trim();
                 if (name.isNotEmpty) {
-                  await ref
-                      .read(networksNotifierProvider.notifier)
-                      .createNetwork(name, driver: selectedDriver);
+                  if (!context.mounted) return;
+                  if (!await runResourceAction(
+                    context,
+                    'Create network: $name',
+                    () => ref
+                        .read(networksNotifierProvider.notifier)
+                        .createNetwork(name, driver: selectedDriver),
+                  )) {
+                    return;
+                  }
                   if (ctx.mounted) Navigator.of(ctx).pop();
                 }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
+                foregroundColor: Theme.of(
+                  context,
+                ).colorScheme.onPrimaryContainer,
               ),
               child: const Text('Create'),
             ),
@@ -107,63 +119,61 @@ class _NetworksScreenState extends ConsumerState<NetworksScreen> {
     final filteredNetworks = ref.watch(filteredNetworksProvider);
 
     final primaryColor = Theme.of(context).colorScheme.primary;
-    final primaryContainerColor = Theme.of(context).colorScheme.primaryContainer;
-    final onPrimaryContainerColor = Theme.of(context).colorScheme.onPrimaryContainer;
+    final primaryContainerColor = Theme.of(
+      context,
+    ).colorScheme.primaryContainer;
+    final onPrimaryContainerColor = Theme.of(
+      context,
+    ).colorScheme.onPrimaryContainer;
     final onSurfaceColor = Theme.of(context).colorScheme.onSurface;
     final mutedTextColor = Theme.of(context).textTheme.bodySmall?.color;
 
-    final isAllSelected = filteredNetworks.isNotEmpty &&
+    final isAllSelected =
+        filteredNetworks.isNotEmpty &&
         filteredNetworks.every((n) => _selectedIds.contains(n.id));
-    final isSomeSelected = filteredNetworks.any((n) => _selectedIds.contains(n.id));
-    final selectAllValue = isAllSelected ? true : (isSomeSelected ? null : false);
+    final isSomeSelected = filteredNetworks.any(
+      (n) => _selectedIds.contains(n.id),
+    );
+    final selectAllValue = isAllSelected
+        ? true
+        : (isSomeSelected ? null : false);
 
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(DesignTokens.pagePadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header
-          Row(
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Docker Networks',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Virtual bridge and overlay networks',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
+          PageHeader(
+            title: 'Docker Networks',
+            subtitle: 'Virtual bridge and overlay networks',
+            actions: ElevatedButton.icon(
+              onPressed: () => _showCreateDialog(context, ref),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Create Network'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryContainerColor,
+                foregroundColor: onPrimaryContainerColor,
+                elevation: 0,
               ),
-              const Spacer(),
-              ElevatedButton.icon(
-                onPressed: () => _showCreateDialog(context, ref),
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Create Network'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryContainerColor,
-                  foregroundColor: onPrimaryContainerColor,
-                  elevation: 0,
-                ),
-              ),
-            ],
+            ),
           ),
           const SizedBox(height: 20),
 
           // Data Table
           Expanded(
             child: DataTableShell(
+              errorMessage: networksState.error,
+              onRetry: () =>
+                  ref.read(networksNotifierProvider.notifier).refreshNetworks(),
               title: 'Virtual Network Topology',
               subtitle: _selectedIds.isEmpty
                   ? '${filteredNetworks.length} active networks'
                   : '${_selectedIds.length} network(s) selected',
               showSelectAll: true,
               selectAllValue: selectAllValue,
-              onSelectAllChanged: (val) => _toggleSelectAll(filteredNetworks, val),
+              onSelectAllChanged: (val) =>
+                  _toggleSelectAll(filteredNetworks, val),
               bulkActions: _selectedIds.isEmpty
                   ? null
                   : [
@@ -172,16 +182,27 @@ class _NetworksScreenState extends ConsumerState<NetworksScreen> {
                           final confirm = await ConfirmDialog.show(
                             context,
                             title: 'Remove Selected Networks',
-                            message: 'Remove ${_selectedIds.length} selected networks?',
+                            message:
+                                'Remove ${_selectedIds.length} selected networks?',
                             confirmLabel: 'Remove All',
                             isDestructive: true,
                           );
                           if (confirm == true) {
                             final ids = List<String>.from(_selectedIds);
-                            for (final id in ids) {
-                              await ref.read(networksNotifierProvider.notifier).removeNetwork(id);
+                            if (!context.mounted) return;
+                            if (!await runBulkResourceAction(
+                              context,
+                              'Remove network',
+                              ids,
+                              (id) => ref
+                                  .read(networksNotifierProvider.notifier)
+                                  .removeNetwork(id),
+                              onCompleted: (id) =>
+                                  setState(() => _selectedIds.remove(id)),
+                            )) {
+                              return;
                             }
-                            setState(() => _selectedIds.clear());
+                            if (mounted) setState(() => _selectedIds.clear());
                           }
                         },
                         icon: const Icon(Icons.delete_outline, size: 16),
@@ -192,7 +213,8 @@ class _NetworksScreenState extends ConsumerState<NetworksScreen> {
                         ),
                       ),
                     ],
-              isLoading: networksState.isLoading && networksState.networks.isEmpty,
+              isLoading:
+                  networksState.isLoading && networksState.networks.isEmpty,
               searchBar: TextField(
                 onChanged: (val) {
                   ref.read(networkSearchQueryProvider.notifier).state = val;
@@ -200,7 +222,10 @@ class _NetworksScreenState extends ConsumerState<NetworksScreen> {
                 decoration: const InputDecoration(
                   hintText: 'Search network name...',
                   prefixIcon: Icon(Icons.search, size: 18),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
                 ),
               ),
               columns: const [
@@ -216,7 +241,10 @@ class _NetworksScreenState extends ConsumerState<NetworksScreen> {
                 final isSelected = _selectedIds.contains(net.id);
 
                 return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
                   child: Row(
                     children: [
                       // Checkbox
@@ -269,7 +297,9 @@ class _NetworksScreenState extends ConsumerState<NetworksScreen> {
                       // Subnet
                       Expanded(
                         child: Text(
-                          net.subnet != null ? '${net.subnet} (${net.gateway})' : 'N/A',
+                          net.subnet != null
+                              ? '${net.subnet} (${net.gateway})'
+                              : 'N/A',
                           overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.jetBrainsMono(
                             fontSize: 11,
@@ -282,20 +312,32 @@ class _NetworksScreenState extends ConsumerState<NetworksScreen> {
                       SizedBox(
                         width: 100,
                         child: IconButton(
-                          icon: const Icon(Icons.delete_outline, color: AppColors.error, size: 20),
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            color: AppColors.error,
+                            size: 20,
+                          ),
                           tooltip: 'Remove Network',
                           onPressed: () async {
                             final confirm = await ConfirmDialog.show(
                               context,
                               title: 'Remove Network',
-                              message: 'Permanently remove network "${net.name}"?',
+                              message:
+                                  'Permanently remove network "${net.name}"?',
                               confirmLabel: 'Remove',
                               isDestructive: true,
                             );
                             if (confirm == true) {
-                              await ref
-                                  .read(networksNotifierProvider.notifier)
-                                  .removeNetwork(net.id);
+                              if (!context.mounted) return;
+                              if (!await runResourceAction(
+                                context,
+                                'Remove network: ${net.id}',
+                                () => ref
+                                    .read(networksNotifierProvider.notifier)
+                                    .removeNetwork(net.id),
+                              )) {
+                                return;
+                              }
                             }
                           },
                         ),

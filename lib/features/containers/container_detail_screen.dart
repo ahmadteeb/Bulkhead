@@ -1,3 +1,4 @@
+import '../../widgets/message_dialog.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -10,34 +11,53 @@ import 'package:xterm/xterm.dart';
 import 'package:file_picker/file_picker.dart';
 
 import '../../models/container_model.dart';
+import '../../core/docker_endpoint.dart';
+import '../../core/terminal_session.dart';
+import '../../widgets/resource_action.dart';
+import '../../providers/settings_provider.dart';
 import '../../providers/connection_status_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../theme/design_tokens.dart';
 import '../../widgets/log_viewer.dart';
 import '../../widgets/status_badge.dart';
 
 Future<void> launchNativeContainerTerminal(
   String containerId, {
   String shell = 'bash',
+  required String socketPath,
 }) async {
   final shortId = containerId.length >= 12
       ? containerId.substring(0, 12)
       : containerId;
 
+  final host = shellQuote(dockerHost(socketPath));
+  final command =
+      'docker --host $host exec -it ${shellQuote(shortId)} ${shellQuote(shell)}';
   if (Platform.isMacOS) {
     try {
-      final script = 'tell application "Terminal" to do script "docker exec -it $shortId $shell"';
-      await Process.run('osascript', ['-e', script]);
-      return;
+      final script =
+          'tell application "Terminal" to do script ${jsonEncode(command)}';
+      final result = await Process.run('osascript', [
+        '-e',
+        script,
+      ], environment: dockerEnvironment(socketPath));
+      if (result.exitCode == 0) return;
     } catch (_) {}
   } else if (Platform.isWindows) {
     try {
-      await Process.start('cmd.exe', ['/c', 'start', 'cmd.exe', '/k', 'docker exec -it $shortId $shell']);
+      await Process.start('cmd.exe', [
+        '/c',
+        'start',
+        'cmd.exe',
+        '/k',
+        'docker exec -it $shortId $shell',
+      ], environment: dockerEnvironment(socketPath));
       return;
     } catch (_) {}
   }
 
   final execCmd =
-      'docker exec -it $shortId $shell || docker exec -it $shortId sh';
+      '$command || docker --host $host exec -it ${shellQuote(shortId)} sh';
 
   final terminals = [
     [
@@ -83,13 +103,20 @@ Future<void> launchNativeContainerTerminal(
 
   for (final t in terminals) {
     try {
-      final res = await Process.run('which', [t.first]);
+      final res = await Process.run('which', [
+        t.first,
+      ], environment: dockerEnvironment(socketPath));
       if (res.exitCode == 0) {
-        await Process.start(t.first, t.sublist(1));
+        await Process.start(
+          t.first,
+          t.sublist(1),
+          environment: dockerEnvironment(socketPath),
+        );
         return;
       }
     } catch (_) {}
   }
+  throw StateError('No supported external terminal could be opened.');
 }
 
 class ContainerDetailScreen extends ConsumerStatefulWidget {
@@ -190,7 +217,7 @@ class _ContainerDetailScreenState extends ConsumerState<ContainerDetailScreen>
         _currentMem = memUsage;
         _maxMem = memLimit;
 
-        final double spotIndex = _cpuPoints.length.toDouble();
+        final double spotIndex = _cpuPoints.isEmpty ? 0 : _cpuPoints.last.x + 1;
         _cpuPoints.add(FlSpot(spotIndex, cpuPercent));
         _memPoints.add(
           FlSpot(spotIndex, (memUsage / (1024 * 1024)).toDouble()),
@@ -239,7 +266,7 @@ class _ContainerDetailScreenState extends ConsumerState<ContainerDetailScreen>
     final client = ref.watch(dockerApiClientProvider);
 
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(DesignTokens.pagePadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -323,12 +350,13 @@ class _ContainerDetailScreenState extends ConsumerState<ContainerDetailScreen>
                 // 2. Exec Terminal Tab
                 _ContainerExecView(
                   containerId: widget.container.id,
-                  client: client,
+                  socketPath: ref.watch(socketPathProvider),
                 ),
 
                 // 3. Volume File Browser Tab
                 _ContainerVolumeBrowserView(
                   containerId: widget.container.id,
+                  socketPath: ref.watch(socketPathProvider),
                   mounts: widget.container.mounts,
                   client: client,
                 ),
@@ -503,12 +531,20 @@ class _ContainerDetailScreenState extends ConsumerState<ContainerDetailScreen>
               IconButton(
                 icon: const Icon(Icons.copy, size: 18),
                 tooltip: 'Copy JSON',
-                onPressed: () {
-                  Clipboard.setData(ClipboardData(text: jsonStr));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Inspect JSON copied to clipboard!'),
-                    ),
+                onPressed: () async {
+                  if (!await runResourceAction(
+                    context,
+                    'Copy inspect JSON',
+                    () => Clipboard.setData(ClipboardData(text: jsonStr)),
+                  )) {
+                    return;
+                  }
+                  if (!context.mounted) return;
+                  showMessageDialog(
+                    context,
+                    title: 'Information',
+                    message: 'Inspect JSON copied to clipboard!',
+                    type: MessageType.info,
                   );
                 },
               ),
@@ -693,9 +729,12 @@ class _ContainerDetailScreenState extends ConsumerState<ContainerDetailScreen>
 
 class _ContainerExecView extends StatefulWidget {
   final String containerId;
-  final dynamic client;
+  final String socketPath;
 
-  const _ContainerExecView({required this.containerId, required this.client});
+  const _ContainerExecView({
+    required this.containerId,
+    required this.socketPath,
+  });
 
   @override
   State<_ContainerExecView> createState() => _ContainerExecViewState();
@@ -703,9 +742,11 @@ class _ContainerExecView extends StatefulWidget {
 
 class _ContainerExecViewState extends State<_ContainerExecView> {
   late final Terminal _terminal;
-  Process? _process;
+  final _session = TerminalSession();
+  Process? get _process => _session.process;
+  StreamSubscription<String>? _stdoutSub;
+  StreamSubscription<String>? _stderrSub;
   String _selectedShell = '/bin/bash';
-  final List<String> _terminalLogBuffer = [];
 
   final List<String> _availableShells = ['/bin/sh', '/bin/bash'];
 
@@ -727,112 +768,93 @@ class _ContainerExecViewState extends State<_ContainerExecView> {
     return s;
   }
 
+  Future<Process> _spawnTerminal(String id, String shell) async {
+    final environment = dockerEnvironment(widget.socketPath);
+    if (Platform.isMacOS) {
+      try {
+        return await Process.start('script', [
+          '-q',
+          '/dev/null',
+          'docker',
+          'exec',
+          '-it',
+          id,
+          shell,
+        ], environment: environment);
+      } catch (_) {
+        /* Fall back to stdin/stdout when script is unavailable. */
+      }
+    } else if (Platform.isLinux) {
+      try {
+        final script = await Process.run('which', ['script']);
+        if (script.exitCode == 0) {
+          return await Process.start('script', [
+            '-q',
+            '-c',
+            'docker exec -it ${shellQuote(id)} ${shellQuote(shell)}',
+            '/dev/null',
+          ], environment: environment);
+        }
+      } catch (_) {
+        /* Fall back to stdin/stdout when script is unavailable. */
+      }
+    }
+    return Process.start('docker', [
+      'exec',
+      '-i',
+      '-e',
+      'TERM=xterm-256color',
+      id,
+      shell,
+    ], environment: environment);
+  }
+
   Future<void> _connectTerminal() async {
-    _process?.kill();
-    _terminalLogBuffer.clear();
+    _stdoutSub?.cancel();
+    _stderrSub?.cancel();
     _terminal.write(
       'Connecting interactive terminal to container ($_selectedShell)...\r\n',
     );
-
     try {
-      final shortId = widget.containerId.length >= 12
+      final id = widget.containerId.length >= 12
           ? widget.containerId.substring(0, 12)
           : widget.containerId;
-      if (Platform.isMacOS) {
-        try {
-          _process = await Process.start('script', [
-            '-q',
-            '/dev/null',
-            'docker',
-            'exec',
-            '-it',
-            shortId,
-            _selectedShell,
-          ]);
-        } catch (_) {
-          _process = await Process.start('docker', [
-            'exec',
-            '-i',
-            '-e',
-            'TERM=xterm-256color',
-            shortId,
-            _selectedShell,
-          ]);
-        }
-      } else if (Platform.isLinux) {
-        try {
-          final scriptCheck = await Process.run('which', ['script']);
-          if (scriptCheck.exitCode == 0) {
-            _process = await Process.start('script', [
-              '-q',
-              '-c',
-              'docker exec -it $shortId $_selectedShell',
-              '/dev/null',
-            ]);
-          } else {
-            _process = await Process.start('docker', [
-              'exec',
-              '-i',
-              '-e',
-              'TERM=xterm-256color',
-              shortId,
-              _selectedShell,
-            ]);
-          }
-        } catch (_) {
-          _process = await Process.start('docker', [
-            'exec',
-            '-i',
-            '-e',
-            'TERM=xterm-256color',
-            shortId,
-            _selectedShell,
-          ]);
-        }
-      } else {
-        // Windows
-        _process = await Process.start('docker', [
-          'exec',
-          '-i',
-          '-e',
-          'TERM=xterm-256color',
-          shortId,
-          _selectedShell,
-        ]);
+      final process = await _session.start(
+        () => _spawnTerminal(id, _selectedShell),
+      );
+      if (process == null) return;
+      void output(String text) {
+        if (!mounted || !identical(_session.process, process)) return;
+        final cleaned = _cleanTerminalOutput(text);
+        _terminal.write(
+          cleaned.replaceAll('\r\n', '\n').replaceAll('\n', '\r\n'),
+        );
       }
 
-      _process!.stdout.listen((data) {
-        final text = utf8.decode(data, allowMalformed: true);
-        final cleaned = _cleanTerminalOutput(text);
-        final normalized = cleaned
-            .replaceAll('\r\n', '\n')
-            .replaceAll('\n', '\r\n');
-        _terminal.write(normalized);
-        _terminalLogBuffer.add(text);
-      });
-      _process!.stderr.listen((data) {
-        final text = utf8.decode(data, allowMalformed: true);
-        final cleaned = _cleanTerminalOutput(text);
-        final normalized = cleaned
-            .replaceAll('\r\n', '\n')
-            .replaceAll('\n', '\r\n');
-        _terminal.write(normalized);
-        _terminalLogBuffer.add(text);
-      });
-
+      void error(Object error) =>
+          output('\r\n[Terminal I/O error: $error]\r\n');
+      _stdoutSub = process.stdout
+          .transform(const Utf8Decoder(allowMalformed: true))
+          .listen(output, onError: error);
+      _stderrSub = process.stderr
+          .transform(const Utf8Decoder(allowMalformed: true))
+          .listen(output, onError: error);
       _terminal.onOutput = (input) {
-        _process?.stdin.write(input);
-      };
-
-      _process!.exitCode.then((code) {
-        if (mounted) {
-          _terminal.write(
-            '\r\n[Container terminal session closed (Exit code $code)]\r\n',
-          );
+        if (mounted && identical(_session.process, process)) {
+          process.stdin.write(input);
         }
-      });
-    } catch (e) {
-      _terminal.write('Failed to spawn container terminal process: $e\r\n');
+      };
+      process.exitCode.then(
+        (code) => output(
+          '\r\n[Container terminal session closed (Exit code $code)]\r\n',
+        ),
+      );
+    } catch (error) {
+      if (mounted) {
+        _terminal.write(
+          'Failed to spawn container terminal process: $error\r\n',
+        );
+      }
     }
   }
 
@@ -883,14 +905,20 @@ class _ContainerExecViewState extends State<_ContainerExecView> {
     }
   }
 
-  void _copyTerminalLogs() {
-    final fullText = _terminalLogBuffer.join('');
-    Clipboard.setData(ClipboardData(text: fullText));
+  void _copyTerminalLogs() async {
+    final fullText = _terminal.buffer.getText();
+    await runResourceAction(
+      context,
+      'Copy terminal logs',
+      () => Clipboard.setData(ClipboardData(text: fullText)),
+    );
   }
 
   @override
   void dispose() {
-    _process?.kill();
+    _session.dispose();
+    _stdoutSub?.cancel();
+    _stderrSub?.cancel();
     super.dispose();
   }
 
@@ -954,9 +982,14 @@ class _ContainerExecViewState extends State<_ContainerExecView> {
             ),
             const Spacer(),
             ElevatedButton.icon(
-              onPressed: () => launchNativeContainerTerminal(
-                widget.containerId,
-                shell: _selectedShell,
+              onPressed: () => runResourceAction(
+                context,
+                'Open external terminal',
+                () => launchNativeContainerTerminal(
+                  widget.containerId,
+                  shell: _selectedShell,
+                  socketPath: widget.socketPath,
+                ),
               ),
               icon: const Icon(Icons.open_in_new, size: 18),
               label: const Text('Open External Terminal'),
@@ -1000,11 +1033,13 @@ class _ContainerExecViewState extends State<_ContainerExecView> {
 
 class _ContainerVolumeBrowserView extends StatefulWidget {
   final String containerId;
+  final String socketPath;
   final List<ContainerMountPoint> mounts;
   final dynamic client;
 
   const _ContainerVolumeBrowserView({
     required this.containerId,
+    required this.socketPath,
     required this.mounts,
     required this.client,
   });
@@ -1084,35 +1119,33 @@ class _ContainerVolumeBrowserViewState
           'cp',
           hostPath,
           '$shortId:$currentPath',
-        ]);
+        ], environment: dockerEnvironment(widget.socketPath));
         if (mounted) {
           if (res.exitCode == 0) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Uploaded ${files.first.name} successfully!',
-                ),
-                backgroundColor: AppColors.success,
-              ),
+            showMessageDialog(
+              context,
+              title: 'Completed',
+              message: 'Uploaded ${files.first.name} successfully!',
+              type: MessageType.success,
             );
             _loadFiles(currentPath, pushHistory: false);
           } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Upload failed: ${res.stderr}'),
-                backgroundColor: AppColors.error,
-              ),
+            showMessageDialog(
+              context,
+              title: 'Operation failed',
+              message: 'Upload failed: ${res.stderr}',
+              type: MessageType.error,
             );
           }
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Upload error: $e'),
-            backgroundColor: AppColors.error,
-          ),
+        showMessageDialog(
+          context,
+          title: 'Operation failed',
+          message: 'Upload error: $e',
+          type: MessageType.error,
         );
       }
     }
@@ -1135,31 +1168,31 @@ class _ContainerVolumeBrowserViewState
         'cp',
         '$shortId:$remotePath',
         '$targetDir/',
-      ]);
+      ], environment: dockerEnvironment(widget.socketPath));
       if (mounted) {
         if (res.exitCode == 0) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Downloaded $fileName to $targetDir!'),
-              backgroundColor: AppColors.success,
-            ),
+          showMessageDialog(
+            context,
+            title: 'Completed',
+            message: 'Downloaded $fileName to $targetDir!',
+            type: MessageType.success,
           );
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Download failed: ${res.stderr}'),
-              backgroundColor: AppColors.error,
-            ),
+          showMessageDialog(
+            context,
+            title: 'Operation failed',
+            message: 'Download failed: ${res.stderr}',
+            type: MessageType.error,
           );
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Download error: $e'),
-            backgroundColor: AppColors.error,
-          ),
+        showMessageDialog(
+          context,
+          title: 'Operation failed',
+          message: 'Download error: $e',
+          type: MessageType.error,
         );
       }
     }

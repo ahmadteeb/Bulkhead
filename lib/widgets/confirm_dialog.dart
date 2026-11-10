@@ -46,27 +46,30 @@ class ConfirmDialog extends StatelessWidget {
       title: Row(
         children: [
           Icon(
-            isDestructive ? Icons.warning_amber_rounded : Icons.info_outline_rounded,
+            isDestructive
+                ? Icons.warning_amber_rounded
+                : Icons.info_outline_rounded,
             color: isDestructive ? AppColors.error : primaryColor,
           ),
           const SizedBox(width: 10),
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+          Expanded(
+            child: Text(
+              title,
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
           ),
         ],
       ),
-      content: Text(
-        message,
-        style: Theme.of(context).textTheme.bodyMedium,
-      ),
+      content: Text(message, style: Theme.of(context).textTheme.bodyMedium),
       actions: [
         OutlinedButton(
           onPressed: () => Navigator.of(context).pop(false),
           style: OutlinedButton.styleFrom(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
             side: BorderSide(color: borderColor),
           ),
           child: const Text('Cancel'),
@@ -77,7 +80,9 @@ class ConfirmDialog extends StatelessWidget {
             backgroundColor: isDestructive ? AppColors.error : primaryColor,
             foregroundColor: Colors.white,
             elevation: 0,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
           child: Text(confirmLabel),
         ),

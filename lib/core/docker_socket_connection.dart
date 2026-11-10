@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'windows_pipe_socket.dart';
 
 class DockerPermissionDeniedException implements Exception {
   final String message;
@@ -56,30 +57,39 @@ class DockerSocketConnection {
   }
 
   DockerSocketConnection({String? socketPath})
-      : socketPath = socketPath ?? defaultSocketPath;
+    : socketPath = socketPath ?? defaultSocketPath;
 
   Future<Socket> _connectSocket() async {
     try {
       if (socketPath.startsWith('tcp://') || socketPath.startsWith('http://')) {
         final uri = Uri.parse(socketPath);
-        return await Socket.connect(uri.host, uri.port != 0 ? uri.port : 2375);
+        return await Socket.connect(
+          uri.host,
+          uri.port != 0 ? uri.port : 2375,
+          timeout: const Duration(seconds: 10),
+        );
       }
       if (Platform.isWindows) {
-        try {
-          return await Socket.connect(InternetAddress.loopbackIPv4, 2375);
-        } catch (_) {
-          final address = InternetAddress(socketPath, type: InternetAddressType.unix);
-          return await Socket.connect(address, 0);
-        }
+        return await WindowsPipeSocket.connect(socketPath);
       }
-      final address = InternetAddress(socketPath, type: InternetAddressType.unix);
-      return await Socket.connect(address, 0);
+      final address = InternetAddress(
+        socketPath,
+        type: InternetAddressType.unix,
+      );
+      return await Socket.connect(
+        address,
+        0,
+        timeout: const Duration(seconds: 10),
+      );
     } on SocketException catch (e) {
-      if (e.osError?.errorCode == 13 || e.message.toLowerCase().contains('permission denied')) {
+      if (e.osError?.errorCode == 13 ||
+          (Platform.isWindows && e.osError?.errorCode == 5) ||
+          e.message.toLowerCase().contains('permission denied')) {
         throw DockerPermissionDeniedException(
           'Permission denied on $socketPath. Please ensure your user is added to the "docker" group.',
         );
-      } else if (e.osError?.errorCode == 2 || e.message.toLowerCase().contains('no such file')) {
+      } else if (e.osError?.errorCode == 2 ||
+          e.message.toLowerCase().contains('no such file')) {
         throw DockerSocketNotFoundException(
           'Docker socket not found at $socketPath. Please verify Docker daemon is running.',
         );
@@ -88,215 +98,100 @@ class DockerSocketConnection {
     }
   }
 
-  /// Sends a single HTTP request over Unix socket and returns response
+  // Let the standard HTTP client decode chunk boundaries and response lengths.
+  HttpClient _httpClient() {
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 10);
+    client.findProxy = (_) => 'DIRECT';
+    client.connectionFactory = (uri, proxyHost, proxyPort) async {
+      var cancelled = false;
+      Socket? connected;
+      final pending = _connectSocket().then((socket) {
+        connected = socket;
+        if (cancelled) {
+          socket.destroy();
+          throw const SocketException('Docker connection cancelled');
+        }
+        return socket;
+      });
+      return ConnectionTask.fromSocket(pending, () {
+        cancelled = true;
+        connected?.destroy();
+      });
+    };
+    return client;
+  }
+
+  Future<HttpClientResponse> _open(
+    HttpClient client,
+    String method,
+    String path,
+    Map<String, String>? headers,
+    String? body,
+  ) async {
+    final request = await client.openUrl(
+      method,
+      Uri.parse('http://localhost$path'),
+    );
+    request.followRedirects = false;
+    request.headers.set(HttpHeaders.acceptHeader, 'application/json, */*');
+    headers?.forEach(request.headers.set);
+    if (body != null) {
+      request.headers.contentType = ContentType.json;
+      request.add(utf8.encode(body));
+    }
+    return request.close().timeout(const Duration(seconds: 30));
+  }
+
   Future<RawHttpResponse> request({
     required String method,
     required String path,
     Map<String, String>? headers,
     String? body,
   }) async {
-    final socket = await _connectSocket();
-
-    final reqHeaders = <String, String>{
-      'Host': 'localhost',
-      'User-Agent': 'Bulkhead-Flutter/1.0',
-      'Accept': 'application/json, */*',
-      'Connection': 'close',
-      if (body != null) 'Content-Type': 'application/json',
-      if (body != null) 'Content-Length': utf8.encode(body).length.toString(),
-      ...?headers,
-    };
-
-    final headerBuffer = StringBuffer();
-    headerBuffer.write('$method $path HTTP/1.1\r\n');
-    reqHeaders.forEach((key, value) {
-      headerBuffer.write('$key: $value\r\n');
-    });
-    headerBuffer.write('\r\n');
-
-    socket.write(headerBuffer.toString());
-    if (body != null) {
-      socket.write(body);
+    final client = _httpClient();
+    try {
+      final response = await _open(client, method, path, headers, body);
+      final text = await response
+          .transform(utf8.decoder)
+          .join()
+          .timeout(const Duration(seconds: 30));
+      final responseHeaders = <String, String>{};
+      response.headers.forEach(
+        (key, values) => responseHeaders[key] = values.join(', '),
+      );
+      return RawHttpResponse(
+        statusCode: response.statusCode,
+        statusReason: response.reasonPhrase,
+        headers: responseHeaders,
+        body: text,
+      );
+    } finally {
+      client.close(force: true);
     }
-    await socket.flush();
-
-    final completer = Completer<RawHttpResponse>();
-    final bytesBuilder = BytesBuilder();
-
-    socket.listen(
-      (data) {
-        bytesBuilder.add(data);
-      },
-      onDone: () {
-        final allBytes = bytesBuilder.takeBytes();
-        completer.complete(_parseRawHttpResponse(allBytes));
-      },
-      onError: (err) {
-        if (!completer.isCompleted) completer.completeError(err);
-      },
-    );
-
-    return completer.future.whenComplete(() {
-      socket.destroy();
-    });
   }
 
-  /// Streams raw bytes after HTTP response headers over Unix socket
   Stream<Uint8List> streamResponse({
     required String method,
     required String path,
     Map<String, String>? headers,
     String? body,
   }) async* {
-    final socket = await _connectSocket();
-
-    final reqHeaders = <String, String>{
-      'Host': 'localhost',
-      'User-Agent': 'Bulkhead-Flutter/1.0',
-      'Accept': '*/*',
-      if (body != null) 'Content-Type': 'application/json',
-      if (body != null) 'Content-Length': utf8.encode(body).length.toString(),
-      ...?headers,
-    };
-
-    final headerBuffer = StringBuffer();
-    headerBuffer.write('$method $path HTTP/1.1\r\n');
-    reqHeaders.forEach((key, value) {
-      headerBuffer.write('$key: $value\r\n');
-    });
-    headerBuffer.write('\r\n');
-
-    socket.write(headerBuffer.toString());
-    if (body != null) {
-      socket.write(body);
-    }
-    await socket.flush();
-
-    bool headersParsed = false;
-    final headerBufferBytes = BytesBuilder();
-
+    final client = _httpClient();
     try {
-      await for (final chunk in socket) {
-        if (!headersParsed) {
-          headerBufferBytes.add(chunk);
-          final bytes = headerBufferBytes.toBytes();
-
-          // Find \r\n\r\n (13, 10, 13, 10)
-          int headerEnd = -1;
-          for (int i = 0; i <= bytes.length - 4; i++) {
-            if (bytes[i] == 13 && bytes[i + 1] == 10 && bytes[i + 2] == 13 && bytes[i + 3] == 10) {
-              headerEnd = i + 4;
-              break;
-            }
-          }
-
-          if (headerEnd != -1) {
-            headersParsed = true;
-            if (headerEnd < bytes.length) {
-              yield Uint8List.fromList(bytes.sublist(headerEnd));
-            }
-          }
-        } else {
-          yield Uint8List.fromList(chunk);
-        }
+      final response = await _open(client, method, path, headers, body);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        final message = await response
+            .transform(utf8.decoder)
+            .join()
+            .timeout(const Duration(seconds: 30));
+        throw HttpException('Docker returned ${response.statusCode}: $message');
+      }
+      await for (final chunk in response) {
+        yield Uint8List.fromList(chunk);
       }
     } finally {
-      socket.destroy();
+      client.close(force: true);
     }
-  }
-
-  RawHttpResponse _parseRawHttpResponse(Uint8List allBytes) {
-    int headerEnd = -1;
-    for (int i = 0; i <= allBytes.length - 4; i++) {
-      if (allBytes[i] == 13 && allBytes[i + 1] == 10 && allBytes[i + 2] == 13 && allBytes[i + 3] == 10) {
-        headerEnd = i + 4;
-        break;
-      }
-    }
-
-    if (headerEnd == -1) {
-      // Full body without proper HTTP header or empty response
-      return RawHttpResponse(
-        statusCode: 500,
-        statusReason: 'Invalid HTTP response format',
-        headers: {},
-        body: utf8.decode(allBytes, allowMalformed: true),
-      );
-    }
-
-    final headerString = utf8.decode(allBytes.sublist(0, headerEnd - 4), allowMalformed: true);
-    final rawBodyBytes = allBytes.sublist(headerEnd);
-
-    final lines = headerString.split('\r\n');
-    final statusLine = lines.isNotEmpty ? lines[0] : '';
-    final statusParts = statusLine.split(' ');
-    
-    int statusCode = 200;
-    String statusReason = 'OK';
-    if (statusParts.length >= 2) {
-      statusCode = int.tryParse(statusParts[1]) ?? 200;
-    }
-    if (statusParts.length >= 3) {
-      statusReason = statusParts.sublist(2).join(' ');
-    }
-
-    final responseHeaders = <String, String>{};
-    for (int i = 1; i < lines.length; i++) {
-      final idx = lines[i].indexOf(':');
-      if (idx != -1) {
-        final k = lines[i].substring(0, idx).trim().toLowerCase();
-        final v = lines[i].substring(idx + 1).trim();
-        responseHeaders[k] = v;
-      }
-    }
-
-    String decodedBody;
-    final isChunked = responseHeaders['transfer-encoding']?.contains('chunked') ?? false;
-    if (isChunked) {
-      decodedBody = _decodeChunkedBody(rawBodyBytes);
-    } else {
-      decodedBody = utf8.decode(rawBodyBytes, allowMalformed: true);
-    }
-
-    return RawHttpResponse(
-      statusCode: statusCode,
-      statusReason: statusReason,
-      headers: responseHeaders,
-      body: decodedBody,
-    );
-  }
-
-  String _decodeChunkedBody(Uint8List bytes) {
-    final buffer = StringBuffer();
-    int offset = 0;
-
-    while (offset < bytes.length) {
-      // Find \r\n after hex chunk size
-      int lineEnd = -1;
-      for (int i = offset; i < bytes.length - 1; i++) {
-        if (bytes[i] == 13 && bytes[i + 1] == 10) {
-          lineEnd = i;
-          break;
-        }
-      }
-      if (lineEnd == -1) break;
-
-      final hexStr = utf8.decode(bytes.sublist(offset, lineEnd)).trim().split(';')[0];
-      final chunkSize = int.tryParse(hexStr, radix: 16) ?? 0;
-
-      if (chunkSize == 0) break;
-
-      final dataStart = lineEnd + 2;
-      final dataEnd = dataStart + chunkSize;
-      if (dataEnd > bytes.length) {
-        buffer.write(utf8.decode(bytes.sublist(dataStart), allowMalformed: true));
-        break;
-      }
-
-      buffer.write(utf8.decode(bytes.sublist(dataStart, dataEnd), allowMalformed: true));
-      offset = dataEnd + 2; // skip \r\n after chunk data
-    }
-
-    return buffer.toString();
   }
 }

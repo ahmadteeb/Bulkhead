@@ -28,7 +28,9 @@ class ContainersState {
 }
 
 final containerSearchQueryProvider = StateProvider<String>((ref) => '');
-final containerFilterStateProvider = StateProvider<String>((ref) => 'all'); // 'all', 'running', 'stopped'
+final containerFilterStateProvider = StateProvider<String>(
+  (ref) => 'all',
+); // 'all', 'running', 'stopped'
 
 final filteredContainersProvider = Provider<List<ContainerModel>>((ref) {
   final state = ref.watch(containersNotifierProvider);
@@ -54,70 +56,64 @@ final systemDfProvider = FutureProvider<Map<String, int>>((ref) async {
     return {'images': 0, 'containers': 0, 'volumes': 0, 'total': 0};
   }
 
-  try {
-    final df = await client.getSystemDf();
-
-    int imagesBytes = 0;
-    final imagesList = df['Images'] as List<dynamic>? ?? [];
-    for (final img in imagesList) {
-      if (img is Map<String, dynamic>) {
-        imagesBytes += (img['Size'] as int? ?? 0);
-      }
-    }
-
-    int containersBytes = 0;
-    final containersList = df['Containers'] as List<dynamic>? ?? [];
-    for (final c in containersList) {
-      if (c is Map<String, dynamic>) {
-        containersBytes += (c['SizeRw'] as int? ?? 0);
-      }
-    }
-
-    int volumesBytes = 0;
-    final volumesList = df['Volumes'] as List<dynamic>? ?? [];
-    for (final v in volumesList) {
-      if (v is Map<String, dynamic>) {
-        final usage = v['UsageData'] as Map<String, dynamic>? ?? {};
-        volumesBytes += (usage['Size'] as int? ?? 0);
-      }
-    }
-
-    final total = imagesBytes + containersBytes + volumesBytes;
-    return {
-      'images': imagesBytes,
-      'containers': containersBytes,
-      'volumes': volumesBytes,
-      'total': total,
-    };
-  } catch (_) {
-    return {'images': 0, 'containers': 0, 'volumes': 0, 'total': 0};
-  }
+  final df = await client.getSystemDf();
+  return parseSystemDiskUsage(df);
 });
+
+Map<String, int> parseSystemDiskUsage(Map<String, dynamic> df) {
+  int knownSize(Object? value) => value is num && value > 0 ? value.toInt() : 0;
+  var images = 0;
+  for (final image in df['Images'] as List? ?? []) {
+    images += knownSize(image['Size']);
+  }
+  final layersSize = df['LayersSize'];
+  if (layersSize is num && layersSize >= 0) images = layersSize.toInt();
+  var containers = 0;
+  for (final container in df['Containers'] as List? ?? []) {
+    containers += knownSize(container['SizeRw']);
+  }
+  var volumes = 0;
+  for (final volume in df['Volumes'] as List? ?? []) {
+    volumes += knownSize(volume['UsageData']?['Size']);
+  }
+  return {
+    'images': images,
+    'containers': containers,
+    'volumes': volumes,
+    'total': images + containers + volumes,
+  };
+}
 
 class ContainersNotifier extends StateNotifier<ContainersState> {
   final dynamic _client;
   final bool _isConnected;
+  int _refreshGeneration = 0;
 
   ContainersNotifier(this._client, this._isConnected)
-      : super(ContainersState(containers: [], isLoading: true)) {
+    : super(ContainersState(containers: [], isLoading: true)) {
     if (_isConnected) {
       refreshContainers();
     } else {
-      state = ContainersState(containers: [], isLoading: false, error: 'Docker daemon disconnected');
+      state = ContainersState(
+        containers: [],
+        isLoading: false,
+        error: 'Docker daemon disconnected',
+      );
     }
   }
 
   Future<void> refreshContainers({bool silent = false}) async {
     if (!mounted) return;
+    final generation = ++_refreshGeneration;
     if (!silent) {
       state = state.copyWith(isLoading: true, error: null);
     }
     try {
       final list = await _client.getContainers(showAll: true);
-      if (!mounted) return;
+      if (!mounted || generation != _refreshGeneration) return;
       state = ContainersState(containers: list, isLoading: false, error: null);
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || generation != _refreshGeneration) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
@@ -208,7 +204,7 @@ class ContainersNotifier extends StateNotifier<ContainersState> {
 
 final containersNotifierProvider =
     StateNotifierProvider<ContainersNotifier, ContainersState>((ref) {
-  final client = ref.watch(dockerApiClientProvider);
-  final connState = ref.watch(connectionStatusProvider);
-  return ContainersNotifier(client, connState.isConnected);
-});
+      final client = ref.watch(dockerApiClientProvider);
+      final connState = ref.watch(connectionStatusProvider);
+      return ContainersNotifier(client, connState.isConnected);
+    });

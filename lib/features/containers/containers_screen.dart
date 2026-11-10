@@ -1,22 +1,24 @@
+import '../../widgets/message_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../models/container_model.dart';
 import '../../providers/containers_provider.dart';
+import '../../providers/settings_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../theme/design_tokens.dart';
 import '../../widgets/confirm_dialog.dart';
+import '../../widgets/resource_action.dart';
 import '../../widgets/data_table_shell.dart';
+import '../../widgets/page_header.dart';
 import '../../widgets/status_badge.dart';
 import 'container_detail_screen.dart';
 
 class ContainersScreen extends ConsumerStatefulWidget {
   final ValueChanged<ContainerModel> onSelectContainer;
 
-  const ContainersScreen({
-    super.key,
-    required this.onSelectContainer,
-  });
+  const ContainersScreen({super.key, required this.onSelectContainer});
 
   @override
   ConsumerState<ContainersScreen> createState() => _ContainersScreenState();
@@ -105,7 +107,8 @@ class _ContainersScreenState extends ConsumerState<ContainersScreen> {
                   children: [
                     Checkbox(
                       value: autoStart,
-                      onChanged: (val) => setStateDialog(() => autoStart = val ?? true),
+                      onChanged: (val) =>
+                          setStateDialog(() => autoStart = val ?? true),
                     ),
                     const Text('Start container immediately'),
                   ],
@@ -138,7 +141,9 @@ class _ContainersScreenState extends ConsumerState<ContainersScreen> {
                   }
 
                   try {
-                    await ref.read(containersNotifierProvider.notifier).createContainer(
+                    await ref
+                        .read(containersNotifierProvider.notifier)
+                        .createContainer(
                           name: name,
                           image: image,
                           portMappings: ports,
@@ -148,8 +153,11 @@ class _ContainersScreenState extends ConsumerState<ContainersScreen> {
                     if (ctx.mounted) Navigator.of(ctx).pop();
                   } catch (e) {
                     if (ctx.mounted) {
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        SnackBar(content: Text('Failed to run container: $e'), backgroundColor: AppColors.error),
+                      showMessageDialog(
+                        ctx,
+                        title: 'Operation failed',
+                        message: 'Failed to run container: $e',
+                        type: MessageType.error,
                       );
                     }
                   }
@@ -157,7 +165,9 @@ class _ContainersScreenState extends ConsumerState<ContainersScreen> {
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
+                foregroundColor: Theme.of(
+                  context,
+                ).colorScheme.onPrimaryContainer,
               ),
               child: const Text('Run Container'),
             ),
@@ -177,75 +187,66 @@ class _ContainersScreenState extends ConsumerState<ContainersScreen> {
     final mutedTextColor = Theme.of(context).textTheme.bodySmall?.color;
     final variantTextColor = Theme.of(context).colorScheme.onSurfaceVariant;
 
-    final isAllSelected = filteredContainers.isNotEmpty &&
+    final isAllSelected =
+        filteredContainers.isNotEmpty &&
         filteredContainers.every((c) => _selectedIds.contains(c.id));
-    final isSomeSelected = filteredContainers.any((c) => _selectedIds.contains(c.id));
-    final selectAllValue = isAllSelected ? true : (isSomeSelected ? null : false);
+    final isSomeSelected = filteredContainers.any(
+      (c) => _selectedIds.contains(c.id),
+    );
+    final selectAllValue = isAllSelected
+        ? true
+        : (isSomeSelected ? null : false);
 
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(DesignTokens.pagePadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Screen Header
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isNarrow = constraints.maxWidth < 650;
-              final titleSection = Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Containers',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Manage and monitor local container instances',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              );
-
-              final actions = ElevatedButton.icon(
-                onPressed: () => _showRunContainerDialog(context, ref),
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Run Container'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                  foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
-                  elevation: 0,
-                ),
-              );
-
-              if (isNarrow) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    titleSection,
-                    const SizedBox(height: 12),
-                    actions,
-                  ],
-                );
-              }
-
-              return Row(
-                children: [
-                  Expanded(child: titleSection),
-                  actions,
-                ],
-              );
-            },
+          PageHeader(
+            title: 'Containers',
+            subtitle: 'Manage and monitor local container instances',
+            actions: ElevatedButton.icon(
+              onPressed: () => _showRunContainerDialog(context, ref),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Run Container'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                foregroundColor: Theme.of(
+                  context,
+                ).colorScheme.onPrimaryContainer,
+                elevation: 0,
+              ),
+            ),
           ),
           const SizedBox(height: 20),
 
           // Filters row
           Row(
             children: [
-              _buildFilterChip(context, ref, label: 'All', value: 'all', current: activeFilter),
+              _buildFilterChip(
+                context,
+                ref,
+                label: 'All',
+                value: 'all',
+                current: activeFilter,
+              ),
               const SizedBox(width: 8),
-              _buildFilterChip(context, ref, label: 'Running', value: 'running', current: activeFilter),
+              _buildFilterChip(
+                context,
+                ref,
+                label: 'Running',
+                value: 'running',
+                current: activeFilter,
+              ),
               const SizedBox(width: 8),
-              _buildFilterChip(context, ref, label: 'Stopped', value: 'stopped', current: activeFilter),
+              _buildFilterChip(
+                context,
+                ref,
+                label: 'Stopped',
+                value: 'stopped',
+                current: activeFilter,
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -253,21 +254,36 @@ class _ContainersScreenState extends ConsumerState<ContainersScreen> {
           // Main Table Shell
           Expanded(
             child: DataTableShell(
+              errorMessage: containersState.error,
+              onRetry: () => ref
+                  .read(containersNotifierProvider.notifier)
+                  .refreshContainers(),
               title: 'Container List',
               subtitle: _selectedIds.isEmpty
                   ? '${filteredContainers.length} containers matching filter'
                   : '${_selectedIds.length} container(s) selected',
               showSelectAll: true,
               selectAllValue: selectAllValue,
-              onSelectAllChanged: (val) => _toggleSelectAll(filteredContainers, val),
+              onSelectAllChanged: (val) =>
+                  _toggleSelectAll(filteredContainers, val),
               bulkActions: _selectedIds.isEmpty
                   ? null
                   : [
                       ElevatedButton.icon(
                         onPressed: () async {
                           final ids = List<String>.from(_selectedIds);
-                          for (final id in ids) {
-                            await ref.read(containersNotifierProvider.notifier).startContainer(id);
+                          if (!context.mounted) return;
+                          if (!await runBulkResourceAction(
+                            context,
+                            'Start container',
+                            ids,
+                            (id) => ref
+                                .read(containersNotifierProvider.notifier)
+                                .startContainer(id),
+                            onCompleted: (id) =>
+                                setState(() => _selectedIds.remove(id)),
+                          )) {
+                            return;
                           }
                         },
                         icon: const Icon(Icons.play_arrow, size: 16),
@@ -283,13 +299,24 @@ class _ContainersScreenState extends ConsumerState<ContainersScreen> {
                           final confirm = await ConfirmDialog.show(
                             context,
                             title: 'Stop Selected Containers',
-                            message: 'Stop ${_selectedIds.length} selected containers?',
+                            message:
+                                'Stop ${_selectedIds.length} selected containers?',
                             confirmLabel: 'Stop All',
                           );
                           if (confirm == true) {
                             final ids = List<String>.from(_selectedIds);
-                            for (final id in ids) {
-                              await ref.read(containersNotifierProvider.notifier).stopContainer(id);
+                            if (!context.mounted) return;
+                            if (!await runBulkResourceAction(
+                              context,
+                              'Stop container',
+                              ids,
+                              (id) => ref
+                                  .read(containersNotifierProvider.notifier)
+                                  .stopContainer(id),
+                              onCompleted: (id) =>
+                                  setState(() => _selectedIds.remove(id)),
+                            )) {
+                              return;
                             }
                           }
                         },
@@ -301,37 +328,68 @@ class _ContainersScreenState extends ConsumerState<ContainersScreen> {
                       ),
                       const SizedBox(width: 8),
                       IconButton(
-                        icon: const Icon(Icons.restart_alt, size: 20, color: AppColors.primary),
+                        icon: const Icon(
+                          Icons.restart_alt,
+                          size: 20,
+                          color: AppColors.primary,
+                        ),
                         tooltip: 'Restart Selected',
                         onPressed: () async {
                           final ids = List<String>.from(_selectedIds);
-                          for (final id in ids) {
-                            await ref.read(containersNotifierProvider.notifier).restartContainer(id);
+                          if (!context.mounted) return;
+                          if (!await runBulkResourceAction(
+                            context,
+                            'Restart container',
+                            ids,
+                            (id) => ref
+                                .read(containersNotifierProvider.notifier)
+                                .restartContainer(id),
+                            onCompleted: (id) =>
+                                setState(() => _selectedIds.remove(id)),
+                          )) {
+                            return;
                           }
                         },
                       ),
                       IconButton(
-                        icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.error),
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          size: 20,
+                          color: AppColors.error,
+                        ),
                         tooltip: 'Delete Selected',
                         onPressed: () async {
                           final confirm = await ConfirmDialog.show(
                             context,
                             title: 'Remove Selected Containers',
-                            message: 'Permanently remove ${_selectedIds.length} selected containers?',
+                            message:
+                                'Permanently remove ${_selectedIds.length} selected containers? Container writable data will be lost. Attached volumes will be kept.',
                             confirmLabel: 'Remove All',
                             isDestructive: true,
                           );
                           if (confirm == true) {
                             final ids = List<String>.from(_selectedIds);
-                            for (final id in ids) {
-                              await ref.read(containersNotifierProvider.notifier).removeContainer(id, force: true);
+                            if (!context.mounted) return;
+                            if (!await runBulkResourceAction(
+                              context,
+                              'Remove container',
+                              ids,
+                              (id) => ref
+                                  .read(containersNotifierProvider.notifier)
+                                  .removeContainer(id, force: true),
+                              onCompleted: (id) =>
+                                  setState(() => _selectedIds.remove(id)),
+                            )) {
+                              return;
                             }
-                            setState(() => _selectedIds.clear());
+                            if (mounted) setState(() => _selectedIds.clear());
                           }
                         },
                       ),
                     ],
-              isLoading: containersState.isLoading && containersState.containers.isEmpty,
+              isLoading:
+                  containersState.isLoading &&
+                  containersState.containers.isEmpty,
               emptyMessage: 'No containers found.',
               searchBar: TextField(
                 onChanged: (val) {
@@ -340,7 +398,10 @@ class _ContainersScreenState extends ConsumerState<ContainersScreen> {
                 decoration: const InputDecoration(
                   hintText: 'Search container, image...',
                   prefixIcon: Icon(Icons.search, size: 18),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
                 ),
               ),
               columns: const [
@@ -348,7 +409,7 @@ class _ContainersScreenState extends ConsumerState<ContainersScreen> {
                 DataTableColumnSpec(title: 'Container Name', flex: true),
                 DataTableColumnSpec(title: 'Image', flex: true),
                 DataTableColumnSpec(title: 'Port Mappings', width: 180),
-                DataTableColumnSpec(title: 'Actions', width: 210),
+                DataTableColumnSpec(title: 'Actions', width: 248),
               ],
               itemCount: filteredContainers.length,
               rowBuilder: (context, index) {
@@ -361,7 +422,10 @@ class _ContainersScreenState extends ConsumerState<ContainersScreen> {
                       ? const Color(0xFF1E2023)
                       : const Color(0xFFF0F9FF),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
                     child: Row(
                       children: [
                         // Checkbox
@@ -390,9 +454,8 @@ class _ContainersScreenState extends ConsumerState<ContainersScreen> {
                             children: [
                               Text(
                                 container.name,
-                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600),
                               ),
                               const SizedBox(height: 2),
                               Text(
@@ -424,7 +487,9 @@ class _ContainersScreenState extends ConsumerState<ContainersScreen> {
                           child: Text(
                             container.ports.isEmpty
                                 ? 'None'
-                                : container.ports.map((p) => p.toString()).join(', '),
+                                : container.ports
+                                      .map((p) => p.toString())
+                                      .join(', '),
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.jetBrainsMono(
                               fontSize: 11,
@@ -435,71 +500,148 @@ class _ContainersScreenState extends ConsumerState<ContainersScreen> {
 
                         // Actions
                         SizedBox(
-                          width: 210,
+                          width: 248,
                           child: Row(
                             children: [
                               if (container.state == 'running') ...[
                                 IconButton(
-                                  icon: Icon(Icons.terminal, size: 20, color: Theme.of(context).colorScheme.primaryContainer),
-                                  tooltip: 'Open Interactive Container Terminal',
-                                  onPressed: () => launchNativeContainerTerminal(container.id),
+                                  icon: Icon(
+                                    Icons.terminal,
+                                    size: 20,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primaryContainer,
+                                  ),
+                                  tooltip:
+                                      'Open Interactive Container Terminal',
+                                  onPressed: () => runResourceAction(
+                                    context,
+                                    'Open external terminal',
+                                    () => launchNativeContainerTerminal(
+                                      container.id,
+                                      socketPath: ref.read(socketPathProvider),
+                                    ),
+                                  ),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.pause_circle_outline, size: 20, color: AppColors.warning),
+                                  icon: const Icon(
+                                    Icons.pause_circle_outline,
+                                    size: 20,
+                                    color: AppColors.warning,
+                                  ),
                                   tooltip: 'Stop Container',
                                   onPressed: () async {
                                     final confirm = await ConfirmDialog.show(
                                       context,
                                       title: 'Stop Container',
-                                      message: 'Are you sure you want to stop "${container.name}"?',
+                                      message:
+                                          'Are you sure you want to stop "${container.name}"?',
                                       confirmLabel: 'Stop',
                                     );
                                     if (confirm == true) {
-                                      await ref
-                                          .read(containersNotifierProvider.notifier)
-                                          .stopContainer(container.id);
+                                      if (!context.mounted) return;
+                                      if (!await runResourceAction(
+                                        context,
+                                        'Stop container: ${container.id}',
+                                        () => ref
+                                            .read(
+                                              containersNotifierProvider
+                                                  .notifier,
+                                            )
+                                            .stopContainer(container.id),
+                                      )) {
+                                        return;
+                                      }
                                     }
                                   },
                                 ),
                               ] else
                                 IconButton(
-                                  icon: const Icon(Icons.play_circle_outline, size: 20, color: AppColors.success),
+                                  icon: const Icon(
+                                    Icons.play_circle_outline,
+                                    size: 20,
+                                    color: AppColors.success,
+                                  ),
                                   tooltip: 'Start Container',
                                   onPressed: () async {
-                                    await ref
-                                        .read(containersNotifierProvider.notifier)
-                                        .startContainer(container.id);
+                                    if (!context.mounted) return;
+                                    if (!await runResourceAction(
+                                      context,
+                                      'Start container: ${container.id}',
+                                      () => ref
+                                          .read(
+                                            containersNotifierProvider.notifier,
+                                          )
+                                          .startContainer(container.id),
+                                    )) {
+                                      return;
+                                    }
                                   },
                                 ),
                               IconButton(
-                                icon: Icon(Icons.restart_alt, size: 20, color: primaryColor),
+                                icon: Icon(
+                                  Icons.restart_alt,
+                                  size: 20,
+                                  color: primaryColor,
+                                ),
                                 tooltip: 'Restart Container',
                                 onPressed: () async {
-                                  await ref
-                                      .read(containersNotifierProvider.notifier)
-                                      .restartContainer(container.id);
+                                  if (!context.mounted) return;
+                                  if (!await runResourceAction(
+                                    context,
+                                    'Restart container: ${container.id}',
+                                    () => ref
+                                        .read(
+                                          containersNotifierProvider.notifier,
+                                        )
+                                        .restartContainer(container.id),
+                                  )) {
+                                    return;
+                                  }
                                 },
                               ),
                               IconButton(
-                                icon: Icon(Icons.description_outlined, size: 20, color: variantTextColor),
+                                icon: Icon(
+                                  Icons.description_outlined,
+                                  size: 20,
+                                  color: variantTextColor,
+                                ),
                                 tooltip: 'Inspect / Details',
-                                onPressed: () => widget.onSelectContainer(container),
+                                onPressed: () =>
+                                    widget.onSelectContainer(container),
                               ),
                               IconButton(
-                                icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.error),
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  size: 20,
+                                  color: AppColors.error,
+                                ),
                                 tooltip: 'Remove Container',
                                 onPressed: () async {
                                   final confirm = await ConfirmDialog.show(
                                     context,
                                     title: 'Remove Container',
-                                    message: 'Are you sure you want to permanently remove "${container.name}"?',
+                                    message:
+                                        'Permanently remove "${container.name}"? Container writable data will be lost. Attached volumes will be kept.',
                                     confirmLabel: 'Remove',
                                     isDestructive: true,
                                   );
                                   if (confirm == true) {
-                                    await ref
-                                        .read(containersNotifierProvider.notifier)
-                                        .removeContainer(container.id, force: true);
+                                    if (!context.mounted) return;
+                                    if (!await runResourceAction(
+                                      context,
+                                      'Remove container: ${container.id}',
+                                      () => ref
+                                          .read(
+                                            containersNotifierProvider.notifier,
+                                          )
+                                          .removeContainer(
+                                            container.id,
+                                            force: true,
+                                          ),
+                                    )) {
+                                      return;
+                                    }
                                   }
                                 },
                               ),
@@ -526,8 +668,12 @@ class _ContainersScreenState extends ConsumerState<ContainersScreen> {
     required String current,
   }) {
     final isSelected = value == current;
-    final primaryContainerColor = Theme.of(context).colorScheme.primaryContainer;
-    final onPrimaryContainerColor = Theme.of(context).colorScheme.onPrimaryContainer;
+    final primaryContainerColor = Theme.of(
+      context,
+    ).colorScheme.primaryContainer;
+    final onPrimaryContainerColor = Theme.of(
+      context,
+    ).colorScheme.onPrimaryContainer;
     final cardBgColor = AppColors.cardBg(context);
     final borderColor = AppColors.borderColor(context);
 
@@ -540,13 +686,13 @@ class _ContainersScreenState extends ConsumerState<ContainersScreen> {
       selectedColor: primaryContainerColor,
       backgroundColor: cardBgColor,
       labelStyle: TextStyle(
-        color: isSelected ? onPrimaryContainerColor : Theme.of(context).colorScheme.onSurface,
+        color: isSelected
+            ? onPrimaryContainerColor
+            : Theme.of(context).colorScheme.onSurface,
         fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
         fontSize: 13,
       ),
-      side: BorderSide(
-        color: isSelected ? primaryContainerColor : borderColor,
-      ),
+      side: BorderSide(color: isSelected ? primaryContainerColor : borderColor),
     );
   }
 }
