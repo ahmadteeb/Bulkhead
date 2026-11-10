@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'core/app_version.dart';
 
 import 'features/compose/compose_screen.dart';
 import 'features/containers/container_detail_screen.dart';
@@ -18,8 +19,9 @@ import 'providers/settings_provider.dart';
 import 'theme/app_theme.dart';
 import 'widgets/app_sidebar.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AppVersion.init();
   GoogleFonts.config.allowRuntimeFetching = true;
   runApp(const ProviderScope(child: BulkheadApp()));
 }

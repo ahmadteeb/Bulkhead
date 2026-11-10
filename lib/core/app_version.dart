@@ -1,12 +1,13 @@
 import 'package:package_info_plus/package_info_plus.dart';
 
 class AppVersion {
-  static String _version = '1.0.0';
-  static String _buildNumber = '1';
+  static PackageInfo? _info;
 
-  static String get currentVersion => _version;
-  static String get buildNumber => _buildNumber;
-  static String get fullVersionString => '$_version+$_buildNumber';
+  static String get currentVersion =>
+      _info?.version.isNotEmpty == true ? _info!.version : 'Unknown';
+  static String get buildNumber => _info?.buildNumber ?? '';
+  static String get fullVersionString =>
+      buildNumber.isEmpty ? currentVersion : '$currentVersion+$buildNumber';
 
   static const String repoOwner = 'ahmadteeb';
   static const String repoName = 'Bulkhead';
@@ -56,13 +57,7 @@ class AppVersion {
 
   static Future<void> init() async {
     try {
-      final info = await PackageInfo.fromPlatform();
-      if (info.version.isNotEmpty) {
-        _version = info.version;
-      }
-      if (info.buildNumber.isNotEmpty) {
-        _buildNumber = info.buildNumber;
-      }
+      _info = await PackageInfo.fromPlatform();
     } catch (_) {}
   }
 }

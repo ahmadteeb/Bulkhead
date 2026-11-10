@@ -299,7 +299,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Bulkhead Desktop v${AppVersion.currentVersion}',
+                          'Bulkhead Desktop v${AppVersion.fullVersionString}',
                           style: GoogleFonts.jetBrainsMono(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,

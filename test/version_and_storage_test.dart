@@ -2,8 +2,28 @@ import 'package:bulkhead/core/app_version.dart';
 import 'package:bulkhead/models/update_model.dart';
 import 'package:bulkhead/providers/containers_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  test(
+    'version and build number come from installed package metadata',
+    () async {
+      PackageInfo.setMockInitialValues(
+        appName: 'Bulkhead',
+        packageName: 'bulkhead',
+        version: '3.2.1',
+        buildNumber: '47',
+        buildSignature: '',
+      );
+      await AppVersion.init();
+      expect(AppVersion.currentVersion, '3.2.1');
+      expect(AppVersion.buildNumber, '47');
+      expect(AppVersion.fullVersionString, '3.2.1+47');
+    },
+  );
+
   test(
     'release comparison respects prereleases, numeric identifiers and build metadata',
     () {
