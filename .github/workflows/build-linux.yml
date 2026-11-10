@@ -40,18 +40,29 @@ jobs:
       - name: Run Unit Tests
         run: flutter test
 
+      - name: Resolve release version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION=$(awk '/^version:/ {print $2; exit}' pubspec.yaml)
+            VERSION="${VERSION%%+*}"
+          fi
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid release version: $VERSION" >&2
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "BUILD_NUM=${GITHUB_RUN_NUMBER:-1}" >> "$GITHUB_ENV"
+
       - name: Build Linux Desktop Release
         run: |
-          RAW_TAG="${GITHUB_REF#refs/tags/v}"
-          VERSION="${RAW_TAG:-1.0.0}"
-          BUILD_NUM="${GITHUB_RUN_NUMBER:-1}"
           flutter build linux --release --build-name=$VERSION --build-number=$BUILD_NUM
 
       - name: Package Linux Desktop Bundles (.zip, .deb, .rpm, .pkg.tar.zst)
         run: |
           mkdir -p release
-          RAW_TAG="${GITHUB_REF#refs/tags/v}"
-          VERSION="${RAW_TAG:-1.0.0}"
           echo "Packaging version: $VERSION"
 
           # 1. Package ZIP Archive

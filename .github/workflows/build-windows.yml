@@ -38,13 +38,26 @@ jobs:
       - name: Run Unit Tests
         run: flutter test
 
+      - name: Resolve release version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION=$(awk '/^version:/ {print $2; exit}' pubspec.yaml)
+            VERSION="${VERSION%%+*}"
+          fi
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid release version: $VERSION" >&2
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "BUILD_NUM=${GITHUB_RUN_NUMBER:-1}" >> "$GITHUB_ENV"
+
       - name: Build Windows Desktop Release
         shell: pwsh
         run: |
-          $rawTag = "${env:GITHUB_REF}" -replace 'refs/tags/v', ''
-          $version = if ($rawTag) { $rawTag } else { "1.0.0" }
-          $buildNum = if ("${env:GITHUB_RUN_NUMBER}") { "${env:GITHUB_RUN_NUMBER}" } else { "1" }
-          flutter build windows --release --build-name=$version --build-number=$buildNum
+          flutter build windows --release --build-name=$env:VERSION --build-number=$env:BUILD_NUM
 
       - name: Package Windows Desktop Bundle (.zip)
         shell: pwsh

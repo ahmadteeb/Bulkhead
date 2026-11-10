@@ -38,30 +38,43 @@ jobs:
       - name: Run Unit Tests
         run: flutter test
 
+      - name: Resolve release version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION=$(awk '/^version:/ {print $2; exit}' pubspec.yaml)
+            VERSION="${VERSION%%+*}"
+          fi
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid release version: $VERSION" >&2
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "BUILD_NUM=${GITHUB_RUN_NUMBER:-1}" >> "$GITHUB_ENV"
+
       - name: Build macOS Desktop Release
         run: |
-          RAW_TAG="${GITHUB_REF#refs/tags/v}"
-          VERSION="${RAW_TAG:-1.0.0}"
-          BUILD_NUM="${GITHUB_RUN_NUMBER:-1}"
           flutter build macos --release --build-name=$VERSION --build-number=$BUILD_NUM
 
       - name: Package macOS App Bundle (.dmg & .zip)
         run: |
-          mkdir -p release
-          RAW_TAG="${GITHUB_REF#refs/tags/v}"
-          VERSION="${RAW_TAG:-1.0.0}"
+          RELEASE_DIR="$GITHUB_WORKSPACE/release"
+          PRODUCTS_DIR="$GITHUB_WORKSPACE/build/macos/Build/Products/Release"
+          mkdir -p "$RELEASE_DIR"
 
-          if [ -d "build/macos/Build/Products/Release/Bulkhead.app" ]; then
-            cd build/macos/Build/Products/Release
-            zip -r ../../../../../release/bulkhead-macos-app.zip Bulkhead.app
-            cd ../../../../../
-            hdiutil create -volname Bulkhead -srcfolder build/macos/Build/Products/Release/Bulkhead.app -ov -format UDZO release/bulkhead-macos-${VERSION}.dmg
-          elif [ -d "build/macos/Build/Products/Release/bulkhead.app" ]; then
-            cd build/macos/Build/Products/Release
-            zip -r ../../../../../release/bulkhead-macos-app.zip bulkhead.app
-            cd ../../../../../
-            hdiutil create -volname Bulkhead -srcfolder build/macos/Build/Products/Release/bulkhead.app -ov -format UDZO release/bulkhead-macos-${VERSION}.dmg
+          if [ -d "$PRODUCTS_DIR/Bulkhead.app" ]; then
+            APP_NAME="Bulkhead.app"
+          elif [ -d "$PRODUCTS_DIR/bulkhead.app" ]; then
+            APP_NAME="bulkhead.app"
+          else
+            echo "No macOS app bundle found in $PRODUCTS_DIR" >&2
+            exit 1
           fi
+
+          (cd "$PRODUCTS_DIR" && zip -r -y "$RELEASE_DIR/bulkhead-macos-app.zip" "$APP_NAME")
+          hdiutil create -volname Bulkhead -srcfolder "$PRODUCTS_DIR/$APP_NAME" -ov -format UDZO "$RELEASE_DIR/bulkhead-macos-${VERSION}.dmg"
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
